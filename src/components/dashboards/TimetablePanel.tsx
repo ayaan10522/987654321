@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { dbPush, dbListen, dbRemove } from '@/lib/firebase';
+import { dbPush, dbListen, dbRemove, dbUpdate } from '@/lib/firebase';
 import SlidePanel from '@/components/ui/SlidePanel';
 import { 
   Clock, Plus, Trash2, Calendar, BookOpen, 
@@ -41,6 +41,13 @@ const TIME_SLOTS = [
   '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'
 ];
 
+const parseTimeToMinutes = (t: string) => {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+};
+
+const sortTimesAsc = (a: string, b: string) => parseTimeToMinutes(a) - parseTimeToMinutes(b);
+
 const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -48,12 +55,23 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
   const [classes, setClasses] = useState<Class[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [showAddPanel, setShowAddPanel] = useState(false);
+  const [showDaysPanel, setShowDaysPanel] = useState(false);
   const [newEntry, setNewEntry] = useState({
     subject: '',
     day: 'Monday',
     startTime: '08:00',
     endTime: '09:00',
     room: ''
+  });
+  const [workingDays, setWorkingDays] = useState<string[]>(DAYS);
+  const [daysSelection, setDaysSelection] = useState<Record<string, boolean>>({
+    Sunday: false,
+    Monday: true,
+    Tuesday: true,
+    Wednesday: true,
+    Thursday: true,
+    Friday: true,
+    Saturday: false
   });
 
   useEffect(() => {
@@ -89,6 +107,17 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
             }
           }
         }
+      }),
+      dbListen('schoolSettings/workingDays', (data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setWorkingDays(data);
+          const nextSel: Record<string, boolean> = { Sunday: false, Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false, Saturday: false };
+          data.forEach(d => { if (nextSel.hasOwnProperty(d)) nextSel[d] = true; });
+          setDaysSelection(nextSel);
+        } else {
+          setWorkingDays(DAYS);
+          setDaysSelection({ Sunday: false, Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true, Saturday: false });
+        }
       })
     ];
     return () => unsubs.forEach(u => u());
@@ -105,9 +134,21 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
     );
   };
 
+  const getTimeRows = (): string[] => {
+    const entryTimes: string[] = Array.from(
+      new Set(getFilteredTimetable().map(e => e.startTime))
+    );
+    const merged: string[] = Array.from(new Set<string>([...TIME_SLOTS, ...entryTimes]));
+    return merged.sort(sortTimesAsc);
+  };
+
   const handleAddEntry = async () => {
     if (!newEntry.subject || !selectedClass) {
       toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
+      return;
+    }
+    if (parseTimeToMinutes(newEntry.endTime) <= parseTimeToMinutes(newEntry.startTime)) {
+      toast({ title: "Error", description: "End time must be after start time", variant: "destructive" });
       return;
     }
 
@@ -134,6 +175,18 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
   const canEdit = user?.role === 'admin' || user?.role === 'teacher';
 
   const currentClass = classes.find(c => c.id === selectedClass);
+  const selectableDays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const handleToggleDay = (day: string) => {
+    setDaysSelection(prev => ({ ...prev, [day]: !prev[day] }));
+  };
+  const handleSaveDays = async () => {
+    const selected = selectableDays.filter(d => daysSelection[d]);
+    const finalDays = selected.length > 0 ? selected : DAYS;
+    await dbUpdate('schoolSettings', { workingDays: finalDays });
+    setWorkingDays(finalDays);
+    setShowDaysPanel(false);
+    toast({ title: "Success", description: "Working days updated" });
+  };
 
   return (
     <div className="space-y-6">
@@ -160,6 +213,12 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
                 <option key={c.id} value={c.id}>{c.name} (Grade {c.grade})</option>
               ))}
             </select>
+          )}
+          {user?.role === 'admin' && (
+            <Button variant="outline" onClick={() => setShowDaysPanel(true)}>
+              <Calendar className="w-4 h-4 mr-2" />
+              Days
+            </Button>
           )}
           {canEdit && (
             <Button className="bg-gradient-primary" onClick={() => setShowAddPanel(true)}>
@@ -198,7 +257,7 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
                     <Clock className="w-4 h-4 inline mr-2" />
                     Time
                   </th>
-                  {DAYS.map(day => (
+                  {workingDays.map(day => (
                     <th key={day} className="p-4 text-center font-semibold text-foreground border-b border-border">
                       {day}
                     </th>
@@ -206,12 +265,12 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
                 </tr>
               </thead>
               <tbody>
-                {TIME_SLOTS.map((time, index) => (
+                {getTimeRows().map((time, index, arr) => (
                   <tr key={time} className="hover:bg-muted/20 transition-colors">
                     <td className="p-4 border-b border-border/50 font-medium text-muted-foreground">
-                      {time} - {TIME_SLOTS[index + 1] || '17:00'}
+                      {time} - {arr[index + 1] || '17:00'}
                     </td>
-                    {DAYS.map(day => {
+                    {workingDays.map(day => {
                       const entry = getEntryForSlot(day, time);
                       return (
                         <td key={`${day}-${time}`} className="p-2 border-b border-border/50">
@@ -253,7 +312,9 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
         </CardHeader>
         <CardContent>
           {(() => {
-            const today = DAYS[new Date().getDay() - 1] || 'Monday';
+            const weekMap = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            const todayLabel = weekMap[new Date().getDay()];
+            const today = workingDays.includes(todayLabel) ? todayLabel : (workingDays[0] || 'Monday');
             const todayEntries = getFilteredTimetable()
               .filter(t => t.day === today)
               .sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -328,29 +389,21 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground">Start Time *</label>
-              <select
+              <Input
+                type="time"
                 value={newEntry.startTime}
                 onChange={(e) => setNewEntry({ ...newEntry, startTime: e.target.value })}
                 className="w-full h-10 px-3 rounded-lg border border-input bg-background"
-              >
-                {TIME_SLOTS.map(time => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground">End Time *</label>
-              <select
+              <Input
+                type="time"
                 value={newEntry.endTime}
                 onChange={(e) => setNewEntry({ ...newEntry, endTime: e.target.value })}
                 className="w-full h-10 px-3 rounded-lg border border-input bg-background"
-              >
-                {TIME_SLOTS.map((time, i) => (
-                  <option key={time} value={TIME_SLOTS[i + 1] || '17:00'}>
-                    {TIME_SLOTS[i + 1] || '17:00'}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
 
@@ -366,6 +419,29 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
           <Button className="w-full bg-gradient-primary" onClick={handleAddEntry}>
             <Save className="w-4 h-4 mr-2" />
             Save Entry
+          </Button>
+        </div>
+      </SlidePanel>
+      <SlidePanel
+        isOpen={showDaysPanel}
+        onClose={() => setShowDaysPanel(false)}
+        title="Select Working Days"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            {selectableDays.map(day => (
+              <button
+                key={day}
+                onClick={() => handleToggleDay(day)}
+                className={`p-3 rounded-xl border ${daysSelection[day] ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-muted/30 border-border/50'}`}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
+          <Button className="w-full bg-gradient-primary" onClick={handleSaveDays}>
+            <Save className="w-4 h-4 mr-2" />
+            Save Days
           </Button>
         </div>
       </SlidePanel>
