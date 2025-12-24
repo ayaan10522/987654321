@@ -49,16 +49,19 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, currentPage
           { label: 'Classes', icon: <BookOpen className="w-5 h-5" />, path: 'classes' },
           { label: 'Students', icon: <GraduationCap className="w-5 h-5" />, path: 'students' },
           { label: 'Timetable', icon: <Clock className="w-5 h-5" />, path: 'timetable' },
-          { label: 'Reports', icon: <BarChart3 className="w-5 h-5" />, path: 'reports' },
+          { label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, path: 'reports' },
+          { label: 'Settings', icon: <Settings className="w-5 h-5" />, path: 'settings' },
         ];
       case 'teacher':
         return [
           { label: 'Dashboard', icon: <Home className="w-5 h-5" />, path: 'dashboard' },
           { label: 'My Classes', icon: <BookOpen className="w-5 h-5" />, path: 'classes' },
+          { label: 'Timetable', icon: <Clock className="w-5 h-5" />, path: 'timetable' },
           { label: 'Attendance', icon: <Calendar className="w-5 h-5" />, path: 'attendance' },
           { label: 'Homework', icon: <ClipboardList className="w-5 h-5" />, path: 'homework' },
           { label: 'Grades', icon: <FileText className="w-5 h-5" />, path: 'grades' },
           { label: 'Announcements', icon: <Megaphone className="w-5 h-5" />, path: 'announcements' },
+          { label: 'Settings', icon: <Settings className="w-5 h-5" />, path: 'settings' },
         ];
       case 'student':
         return [
@@ -68,6 +71,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, currentPage
           { label: 'Homework', icon: <ClipboardList className="w-5 h-5" />, path: 'homework' },
           { label: 'Grades', icon: <FileText className="w-5 h-5" />, path: 'grades' },
           { label: 'Announcements', icon: <Bell className="w-5 h-5" />, path: 'announcements' },
+          { label: 'Settings', icon: <Settings className="w-5 h-5" />, path: 'settings' },
         ];
       default:
         return [];
