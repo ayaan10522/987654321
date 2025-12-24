@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 interface Student { id: string; name: string; classId: string; className: string; }
-interface Class { id: string; name: string; grade: string; teacherId: string; }
+interface Class { id: string; name: string; grade: string; teacherId: string; secondaryTeachers?: { id: string; name: string }[]; }
 interface Homework { id: string; title: string; description: string; dueDate: string; classId: string; className: string; subject: string; createdAt: string; }
 interface AttendanceRecord { id: string; studentId: string; date: string; status: 'present' | 'absent'; classId: string; }
 interface Announcement { id: string; title: string; content: string; classId: string; className: string; createdAt: string; }
@@ -47,7 +47,8 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
     const unsubs = [
       dbListen('classes', (data) => {
         if (data) {
-          const list = Object.entries(data).map(([id, c]: [string, any]) => ({ id, ...c })).filter((c: Class) => c.teacherId === user?.id);
+          const all = Object.entries(data).map(([id, c]: [string, any]) => ({ id, ...c }));
+          const list = all.filter((c: Class) => c.teacherId === user?.id || (c.secondaryTeachers || []).some(st => st.id === user?.id));
           setMyClasses(list);
           if (list.length > 0 && !selectedClass) setSelectedClass(list[0].id);
         }

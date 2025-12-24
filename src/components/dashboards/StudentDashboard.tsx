@@ -8,8 +8,6 @@ import {
   TrendingUp, Award, Clock, BookOpen, Megaphone, Upload,
   CheckCircle2, AlertCircle, BarChart3, Star
 } from 'lucide-react';
-import TimetablePanel from './TimetablePanel';
-import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts';
 
 interface Homework { id: string; title: string; description: string; dueDate: string; classId: string; className: string; subject: string; createdAt: string; }
 interface AttendanceRecord { id: string; date: string; status: 'present' | 'absent'; }
@@ -246,14 +244,6 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
     );
   }
 
-  if (currentPage === 'schedule') {
-    return (
-      <div ref={ref}>
-        <TimetablePanel currentPage={currentPage} />
-      </div>
-    );
-  }
-
   if (currentPage === 'homework') {
     return (
       <div ref={ref} className="space-y-6">
@@ -303,23 +293,7 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
   }
 
   if (currentPage === 'grades') {
-    const numericGrades = grades.filter(g => !isNaN(parseInt(g.grade)));
-    const avgGrade = numericGrades.length > 0 ? numericGrades.reduce((acc, g) => acc + parseInt(g.grade), 0) / numericGrades.length : 0;
-    const gradeTrend = numericGrades.slice().reverse().map(g => ({
-      date: new Date(g.date).toLocaleDateString(),
-      value: parseInt(g.grade)
-    }));
-    const subjectMap: Record<string, { total: number; count: number }> = {};
-    numericGrades.forEach(g => {
-      const key = g.subject || 'General';
-      subjectMap[key] = subjectMap[key] || { total: 0, count: 0 };
-      subjectMap[key].total += parseInt(g.grade);
-      subjectMap[key].count += 1;
-    });
-    const subjectAverages = Object.entries(subjectMap).map(([subject, { total, count }]) => ({
-      subject,
-      avg: Math.round((total / count) * 10) / 10
-    }));
+    const avgGrade = grades.length > 0 ? grades.filter(g => !isNaN(parseInt(g.grade))).reduce((acc, g) => acc + parseInt(g.grade), 0) / grades.filter(g => !isNaN(parseInt(g.grade))).length : 0;
     return (
       <div ref={ref} className="space-y-6">
         <div><h3 className="text-2xl font-display font-bold">My Grades</h3><p className="text-muted-foreground">View your academic performance</p></div>
@@ -329,37 +303,6 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
           <Card className="shadow-lg border-0 bg-gradient-primary"><CardContent className="p-5 flex items-center gap-4"><Award className="w-10 h-10 text-primary-foreground/80" /><div><p className="text-3xl font-display font-bold text-primary-foreground">{grades.length}</p><p className="text-sm text-primary-foreground/80">Total Grades</p></div></CardContent></Card>
           <Card className="shadow-lg border-0 bg-gradient-gold"><CardContent className="p-5 flex items-center gap-4"><BarChart3 className="w-10 h-10 text-secondary-foreground/80" /><div><p className="text-3xl font-display font-bold text-secondary-foreground">{avgGrade > 0 ? avgGrade.toFixed(1) : 'N/A'}</p><p className="text-sm text-secondary-foreground/80">Average (numeric)</p></div></CardContent></Card>
           <Card className="shadow-lg border-0 bg-gradient-success"><CardContent className="p-5 flex items-center gap-4"><Star className="w-10 h-10 text-primary-foreground/80" /><div><p className="text-3xl font-display font-bold text-primary-foreground">{grades[0]?.grade || 'N/A'}</p><p className="text-sm text-primary-foreground/80">Latest Grade</p></div></CardContent></Card>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="shadow-xl border-0">
-            <CardHeader className="border-b border-border/50"><CardTitle className="font-display">Trend</CardTitle></CardHeader>
-            <CardContent style={{ height: 300 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={gradeTrend}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-          <Card className="shadow-xl border-0">
-            <CardHeader className="border-b border-border/50"><CardTitle className="font-display">Subject Averages</CardTitle></CardHeader>
-            <CardContent style={{ height: 300 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={subjectAverages}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="subject" />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip />
-                  <Bar dataKey="avg" fill="#10b981" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Grades List */}
