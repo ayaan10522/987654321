@@ -36,10 +36,7 @@ interface TimetablePanelProps {
   currentPage: string;
 }
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-const TIME_SLOTS = [
-  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'
-];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
   const { user } = useAuth();
@@ -80,7 +77,9 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
             const myClass = classList.find(c => c.id === user.classId);
             if (myClass) {
               setClasses([myClass]);
-              setSelectedClass(myClass.id);
+            }
+            if (user.classId) {
+              setSelectedClass(user.classId);
             }
           } else {
             setClasses(classList);
@@ -98,6 +97,25 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
     if (!selectedClass) return [];
     return timetable.filter(t => t.classId === selectedClass);
   };
+
+  // Dynamic time slots calculation (exact minutes from entries)
+  const timeSlots = React.useMemo(() => {
+    const current = getFilteredTimetable();
+    if (current.length === 0) {
+      return ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'];
+    }
+    const set = new Set<string>();
+    current.forEach(t => {
+      if (t.startTime) set.add(t.startTime);
+      if (t.endTime) set.add(t.endTime);
+    });
+    const toMinutes = (hhmm: string) => {
+      const [h, m] = hhmm.split(':').map(n => parseInt(n, 10));
+      return h * 60 + (m || 0);
+    };
+    const sorted = Array.from(set).sort((a, b) => toMinutes(a) - toMinutes(b));
+    return sorted;
+  }, [timetable, selectedClass]);
 
   const getEntryForSlot = (day: string, time: string) => {
     return getFilteredTimetable().find(
@@ -206,10 +224,10 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
                 </tr>
               </thead>
               <tbody>
-                {TIME_SLOTS.map((time, index) => (
+                {timeSlots.slice(0, -1).map((time, index) => (
                   <tr key={time} className="hover:bg-muted/20 transition-colors">
                     <td className="p-4 border-b border-border/50 font-medium text-muted-foreground">
-                      {time} - {TIME_SLOTS[index + 1] || '17:00'}
+                      {time} - {timeSlots[index + 1]}
                     </td>
                     {DAYS.map(day => {
                       const entry = getEntryForSlot(day, time);
@@ -253,10 +271,20 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
         </CardHeader>
         <CardContent>
           {(() => {
-            const today = DAYS[new Date().getDay() - 1] || 'Monday';
+            const todayIndex = new Date().getDay();
+            const today = DAYS[(todayIndex + 6) % 7];
             const todayEntries = getFilteredTimetable()
               .filter(t => t.day === today)
               .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+            if (user?.role === 'student' && !selectedClass) {
+              return (
+                <div className="text-center py-8 text-muted-foreground">
+                  <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>You are not assigned to any class</p>
+                </div>
+              );
+            }
 
             if (todayEntries.length === 0) {
               return (
@@ -328,29 +356,19 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground">Start Time *</label>
-              <select
+              <Input
+                type="time"
                 value={newEntry.startTime}
                 onChange={(e) => setNewEntry({ ...newEntry, startTime: e.target.value })}
-                className="w-full h-10 px-3 rounded-lg border border-input bg-background"
-              >
-                {TIME_SLOTS.map(time => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground">End Time *</label>
-              <select
+              <Input
+                type="time"
                 value={newEntry.endTime}
                 onChange={(e) => setNewEntry({ ...newEntry, endTime: e.target.value })}
-                className="w-full h-10 px-3 rounded-lg border border-input bg-background"
-              >
-                {TIME_SLOTS.map((time, i) => (
-                  <option key={time} value={TIME_SLOTS[i + 1] || '17:00'}>
-                    {TIME_SLOTS[i + 1] || '17:00'}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
 
@@ -370,6 +388,7 @@ const TimetablePanel: React.FC<TimetablePanelProps> = ({ currentPage }) => {
         </div>
       </SlidePanel>
     </div>
+
   );
 };
 

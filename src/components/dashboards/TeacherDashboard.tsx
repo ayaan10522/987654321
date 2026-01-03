@@ -12,7 +12,7 @@ import SettingsPanel from './SettingsPanel';
 import { 
   Check, X, Plus, BookOpen, Calendar, FileText, ClipboardCheck, 
   Send, Users, Clock, AlertCircle, CheckCircle2, Megaphone, Trash2,
-  TrendingUp, UserCheck, UserX, ChevronDown, ChevronUp, Save
+  TrendingUp, UserCheck, UserX, ChevronDown, ChevronUp, Save, Eye, Link, ExternalLink
 } from 'lucide-react';
 
 interface Student { id: string; name: string; classId: string; className: string; }
@@ -20,7 +20,7 @@ interface Class { id: string; name: string; grade: string; teacherId: string; se
 interface Homework { id: string; title: string; description: string; dueDate: string; classId: string; className: string; subject: string; createdAt: string; }
 interface AttendanceRecord { id: string; studentId: string; date: string; status: 'present' | 'absent'; classId: string; }
 interface Announcement { id: string; title: string; content: string; classId: string; className: string; createdAt: string; }
-interface Submission { id: string; homeworkId: string; studentId: string; studentName: string; submittedAt: string; status: 'submitted' | 'late' | 'graded'; grade?: string; }
+interface Submission { id: string; homeworkId: string; studentId: string; studentName: string; submittedAt: string; status: 'submitted' | 'late' | 'graded'; grade?: string; content?: string; link?: string; }
 
 interface TeacherDashboardProps { currentPage: string; }
 
@@ -33,6 +33,7 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [showPanel, setShowPanel] = useState<string | null>(null);
+  const [viewingSubmission, setViewingSubmission] = useState<Submission | null>(null);
   const [expandedHomework, setExpandedHomework] = useState<string | null>(null);
   const [newHomework, setNewHomework] = useState({ title: '', description: '', dueDate: '', classId: '', subject: '' });
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', classId: '' });
@@ -325,7 +326,8 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
                               <div key={sub.id} className="flex items-center justify-between p-3 rounded-lg bg-success/5 border border-success/20">
                                 <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-success" /><span className="text-sm font-medium">{sub.studentName}</span></div>
                                 <div className="flex items-center gap-2">
-                                  <Input placeholder="Grade" className="w-20 h-8 text-sm" value={gradeInput[`${sub.studentId}-${hw.id}`] || ''} onChange={(e) => setGradeInput({...gradeInput, [`${sub.studentId}-${hw.id}`]: e.target.value})} />
+                                  <Button size="sm" variant="ghost" onClick={() => setViewingSubmission(sub)}><Eye className="w-4 h-4" /></Button>
+                                  <Input placeholder="Grade" className="w-20 h-8 text-sm" value={gradeInput[`${sub.studentId}-${hw.id}`] || sub.grade || ''} onChange={(e) => setGradeInput({...gradeInput, [`${sub.studentId}-${hw.id}`]: e.target.value})} />
                                   <Button size="sm" variant="outline" onClick={() => handleSaveGrade(sub.studentId, hw.id)}><Check className="w-3 h-3" /></Button>
                                 </div>
                               </div>
@@ -364,6 +366,59 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
               <div className="space-y-2"><label className="text-sm font-medium text-muted-foreground">Class</label><select className="w-full h-10 px-3 rounded-lg border border-input bg-background" value={newHomework.classId} onChange={(e) => setNewHomework({...newHomework, classId: e.target.value})}><option value="">Select</option>{myClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
             </div>
             <Button className="w-full bg-gradient-primary" onClick={handleAddHomework}><Save className="w-4 h-4 mr-2" />Assign</Button>
+          </div>
+        </SlidePanel>
+
+        <SlidePanel isOpen={!!viewingSubmission} onClose={() => setViewingSubmission(null)} title="Submission Details">
+          <div className="space-y-6">
+            {viewingSubmission && (
+              <>
+                <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+                  <h4 className="font-semibold text-lg">{viewingSubmission.studentName}</h4>
+                  <p className="text-sm text-muted-foreground mt-1">Submitted on {new Date(viewingSubmission.submittedAt).toLocaleString()}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Answer / Work</label>
+                  <div className="p-4 rounded-lg bg-background border border-input min-h-[100px] whitespace-pre-wrap text-sm">
+                    {viewingSubmission.content || <span className="text-muted-foreground italic">No text content</span>}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Attachment</label>
+                  {viewingSubmission.link ? (
+                    <a 
+                      href={viewingSubmission.link.startsWith('http') ? viewingSubmission.link : `https://${viewingSubmission.link}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <Link className="w-4 h-4" />
+                      <span className="truncate flex-1 text-sm underline">{viewingSubmission.link}</span>
+                      <ExternalLink className="w-4 h-4 opacity-50" />
+                    </a>
+                  ) : (
+                    <div className="p-3 rounded-lg bg-muted text-muted-foreground text-sm italic">No attachment</div>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t border-border">
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">Grade</label>
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="Enter grade" 
+                      value={gradeInput[`${viewingSubmission.studentId}-${viewingSubmission.homeworkId}`] || viewingSubmission.grade || ''} 
+                      onChange={(e) => setGradeInput({...gradeInput, [`${viewingSubmission.studentId}-${viewingSubmission.homeworkId}`]: e.target.value})} 
+                    />
+                    <Button onClick={() => {
+                      handleSaveGrade(viewingSubmission.studentId, viewingSubmission.homeworkId);
+                      setViewingSubmission(null);
+                    }}>Save Grade</Button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </SlidePanel>
       </div>

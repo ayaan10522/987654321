@@ -12,7 +12,7 @@ import SettingsPanel from './SettingsPanel';
 import { 
   Users, GraduationCap, BookOpen, Plus, Trash2, Check, 
   Megaphone, Send, TrendingUp, Award, Search,
-  UserPlus, School, Bell, Calendar, Clock, ChevronRight, Save, MoreVertical, Cog
+  UserPlus, School, Bell, Calendar, Clock, ChevronRight, Save, MoreVertical, Cog, Lock
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -27,6 +27,7 @@ interface Teacher { id: string; name: string; username: string; password: string
 interface Class { id: string; name: string; grade: string; teacherId: string; teacherName: string; secondaryTeachers?: { id: string; name: string }[]; }
 interface Student { id: string; name: string; username: string; password: string; classId: string; className: string; }
 interface Announcement { id: string; title: string; content: string; priority: 'normal' | 'important' | 'urgent'; createdAt: string; author: string; }
+interface Complaint { id: string; studentId: string; studentName: string; classId: string; className: string; subject: string; message: string; createdAt: string; status: 'sent' | 'read' | 'resolved'; read: boolean; sender?: 'student' | 'admin'; }
 
 interface AdminDashboardProps { currentPage: string; }
 
@@ -35,6 +36,9 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
   const [classes, setClasses] = useState<Class[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+  const [replyMessage, setReplyMessage] = useState('');
   const [showPanel, setShowPanel] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [newTeacher, setNewTeacher] = useState({ name: '', username: '', password: '', subject: '' });
@@ -51,10 +55,27 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
       dbListen('teachers', (data) => setTeachers(data ? Object.entries(data).map(([id, t]: [string, any]) => ({ id, ...t })) : [])),
       dbListen('classes', (data) => setClasses(data ? Object.entries(data).map(([id, c]: [string, any]) => ({ id, ...c })) : [])),
       dbListen('students', (data) => setStudents(data ? Object.entries(data).map(([id, s]: [string, any]) => ({ id, ...s })) : [])),
-      dbListen('announcements', (data) => setAnnouncements(data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []))
+      dbListen('announcements', (data) => setAnnouncements(data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [])),
+      dbListen('complaints', (data) => setComplaints(data ? Object.entries(data).map(([id, c]: [string, any]) => ({ id, ...c })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []))
     ];
     return () => unsubs.forEach(u => u());
   }, []);
+
+  const conversations = React.useMemo(() => {
+    const groups: Record<string, Complaint[]> = {};
+    complaints.forEach(c => {
+      const key = c.studentId || 'unknown';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(c);
+    });
+    const toMinutes = (iso: string) => new Date(iso).getTime();
+    const convs = Object.values(groups).map(group => {
+      const sorted = group.slice().sort((a, b) => toMinutes(a.createdAt) - toMinutes(b.createdAt));
+      const last = sorted[sorted.length - 1];
+      return last;
+    });
+    return convs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [complaints]);
 
   const handleAddTeacher = async () => {
     if (!newTeacher.name || !newTeacher.username || !newTeacher.password || !newTeacher.subject) {
@@ -137,6 +158,26 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
     toast({ title: "Success", description: "Announcement posted" });
   };
 
+  const handleSendReply = async () => {
+    if (!selectedComplaint || !replyMessage.trim()) return;
+
+    await dbPush('complaints', {
+      studentId: selectedComplaint.studentId,
+      studentName: selectedComplaint.studentName,
+      classId: selectedComplaint.classId,
+      className: selectedComplaint.className,
+      subject: "Reply",
+      message: replyMessage,
+      createdAt: new Date().toISOString(),
+      status: 'sent',
+      read: false,
+      sender: 'admin'
+    });
+
+    setReplyMessage('');
+    toast({ title: "Sent", description: "Reply sent to student" });
+  };
+
   const StatCard = ({ title, value, icon: Icon, gradient, delay = 0 }: any) => (
     <Card className={`stat-card border-0 shadow-xl ${gradient} animate-fade-in`} style={{ animationDelay: `${delay}s` }}>
       <CardContent className="p-6">
@@ -176,6 +217,186 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
     return (
       <div ref={ref}>
         <SettingsPanel currentPage={currentPage} />
+      </div>
+    );
+  }
+
+  if (currentPage === 'complaints') {
+    return (
+      <div ref={ref} className="h-[calc(100vh-120px)] flex bg-background rounded-2xl overflow-hidden shadow-2xl border border-border/50">
+        {/* Sidebar */}
+        <div className="w-[350px] flex flex-col border-r border-border/50 bg-muted/10">
+           <div className="p-4 bg-muted/20 border-b border-border/50 flex justify-between items-center">
+             <div className="flex items-center gap-3">
+               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="font-bold text-primary">P</span>
+               </div>
+               <h2 className="font-display font-bold text-lg">Complaints</h2>
+             </div>
+             <div className="flex gap-2">
+               <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="w-4 h-4" /></Button>
+             </div>
+           </div>
+           
+           <div className="p-3">
+             <div className="relative">
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+               <Input 
+                 placeholder="Search or start new chat" 
+                 className="pl-9 bg-muted/20 border-0 focus-visible:ring-1" 
+                 value={searchTerm}
+                 onChange={(e) => setSearchTerm(e.target.value)}
+               />
+             </div>
+           </div>
+
+           <div className="flex-1 overflow-y-auto">
+             {conversations
+               .filter(c => (c.studentName?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (c.subject?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (c.message?.toLowerCase() || '').includes(searchTerm.toLowerCase()))
+               .map(complaint => (
+               <div 
+                 key={complaint.id} 
+                 onClick={() => setSelectedComplaint(complaint)}
+                 className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/30 transition-colors border-b border-border/30 ${selectedComplaint?.id === complaint.id ? 'bg-muted/40' : ''}`}
+               >
+                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                   {(complaint.studentName || '?').charAt(0)}
+                 </div>
+                 <div className="flex-1 min-w-0">
+                   <div className="flex justify-between items-baseline mb-0.5">
+                     <span className="font-semibold text-sm truncate">{complaint.studentName || 'Unknown Student'}</span>
+                     <span className={`text-[10px] ${selectedComplaint?.id === complaint.id ? 'text-primary' : 'text-muted-foreground'}`}>
+                       {new Date(complaint.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                     </span>
+                   </div>
+                   <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                     {complaint.status === 'resolved' && <Check className="w-3 h-3 text-blue-500" />}
+                     {(complaint.subject || 'No Subject') + ' • ' + (complaint.message || '')}
+                   </p>
+                 </div>
+               </div>
+             ))}
+             {conversations.length === 0 && (
+               <div className="p-8 text-center text-muted-foreground text-sm">
+                 <p>No messages</p>
+               </div>
+             )}
+           </div>
+        </div>
+
+        {/* Main Chat Area */}
+        <div className="flex-1 flex flex-col bg-[#efeae2] dark:bg-background relative">
+          {/* Chat Background Pattern Overlay */}
+          <div className="absolute inset-0 opacity-[0.06] pointer-events-none bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat"></div>
+          
+          {selectedComplaint ? (
+            <>
+              {/* Chat Header */}
+              <div className="h-16 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/50 flex items-center justify-between px-4 z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold shadow-sm">
+                    {(selectedComplaint.studentName || '?').charAt(0)}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-sm">{selectedComplaint.studentName || 'Unknown Student'}</span>
+                    <span className="text-xs text-muted-foreground">{selectedComplaint.className || 'Unknown Class'} • Student</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                   {selectedComplaint.status !== 'resolved' && (
+                     <Button size="sm" variant="outline" className="h-9" onClick={() => dbUpdate(`complaints/${selectedComplaint.id}`, { status: 'resolved' })}>
+                       <Check className="w-4 h-4 mr-2" /> Mark Resolved
+                     </Button>
+                   )}
+                   <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => {
+                     dbRemove(`complaints/${selectedComplaint.id}`);
+                     setSelectedComplaint(null);
+                   }}>
+                     <Trash2 className="w-5 h-5" />
+                   </Button>
+                </div>
+              </div>
+
+              {/* Chat Messages */}
+              <div className="flex-1 overflow-y-auto p-4 z-0 space-y-4">
+                <div className="flex justify-center mb-4">
+                  <span className="bg-background/80 backdrop-blur-sm px-3 py-1 rounded-lg text-[10px] text-muted-foreground shadow-sm border border-border/50 uppercase tracking-wider font-medium">
+                    {new Date(selectedComplaint.createdAt).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </span>
+                </div>
+
+                {complaints
+                  .filter(c => c.studentId === selectedComplaint.studentId)
+                  .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                  .map((msg) => (
+                    <div key={msg.id} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[70%] p-3 rounded-2xl shadow-sm relative group ${
+                        msg.sender === 'admin' 
+                          ? 'bg-[#d9fdd3] dark:bg-primary/20 rounded-tr-none' 
+                          : 'bg-white dark:bg-muted rounded-tl-none'
+                      }`}>
+                        {msg.subject !== 'Chat Message' && msg.subject !== 'Reply' && (
+                          <p className="font-bold text-xs text-blue-600 mb-1">{msg.subject}</p>
+                        )}
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground/90">{msg.message}</p>
+                        <div className="flex justify-end items-center gap-1 mt-1">
+                          <span className="text-[10px] text-muted-foreground/80">
+                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {msg.sender === 'admin' && (
+                             <div className="flex -space-x-1">
+                               <Check className="w-3 h-3 text-blue-500" />
+                               <Check className="w-3 h-3 text-blue-500" />
+                             </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                {/* System Message if resolved */}
+                {selectedComplaint.status === 'resolved' && (
+                  <div className="flex justify-center mt-4">
+                     <div className="bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 shadow-sm">
+                       <Check className="w-3 h-3" /> This complaint was marked as resolved
+                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Chat Input Area */}
+              <div className="p-3 bg-background border-t border-border/50 z-10 flex gap-2 items-center">
+                <Button variant="ghost" size="icon"><Plus className="w-5 h-5 text-muted-foreground" /></Button>
+                <Input 
+                  className="flex-1 bg-muted/30 border-0 focus-visible:ring-1"
+                  placeholder="Type a reply..."
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendReply();
+                    }
+                  }}
+                />
+                <Button variant="ghost" size="icon" onClick={handleSendReply} disabled={!replyMessage.trim()}>
+                  <Send className={`w-5 h-5 ${replyMessage.trim() ? 'text-primary' : 'text-muted-foreground'}`} />
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground z-10">
+              <div className="w-24 h-24 rounded-full bg-muted/30 flex items-center justify-center mb-6">
+                <Megaphone className="w-10 h-10 opacity-30" />
+              </div>
+              <h3 className="text-xl font-light text-foreground/70 mb-2">Principal's WhatsApp</h3>
+              <p className="text-sm opacity-60">Select a complaint to view details</p>
+              <div className="mt-8 flex gap-2 text-xs opacity-40">
+                <Lock className="w-3 h-3" /> End-to-end encrypted
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }

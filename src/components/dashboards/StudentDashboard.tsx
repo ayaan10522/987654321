@@ -1,12 +1,17 @@
 import React, { useState, useEffect, forwardRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import SlidePanel from '@/components/ui/SlidePanel';
+import TimetablePanel from './TimetablePanel';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { dbListen, dbPush } from '@/lib/firebase';
 import { 
   Calendar, ClipboardList, FileText, Bell, Check, X, 
   TrendingUp, Award, Clock, BookOpen, Megaphone, Upload,
-  CheckCircle2, AlertCircle, BarChart3, Star
+  CheckCircle2, AlertCircle, BarChart3, Star, Send
 } from 'lucide-react';
 
 interface Homework { id: string; title: string; description: string; dueDate: string; classId: string; className: string; subject: string; createdAt: string; }
@@ -14,18 +19,27 @@ interface AttendanceRecord { id: string; date: string; status: 'present' | 'abse
 interface GradeRecord { id: string; subject: string; grade: string; date: string; teacherName?: string; }
 interface Announcement { id: string; title: string; content: string; createdAt: string; author?: string; priority?: string; }
 interface ClassAnnouncement { id: string; title: string; content: string; classId: string; className: string; teacherName: string; createdAt: string; }
+interface Complaint { id: string; studentId: string; studentName: string; classId: string; className: string; subject: string; message: string; createdAt: string; status: 'sent' | 'read' | 'resolved'; read: boolean; sender?: 'student' | 'admin'; }
 interface Submission { id: string; homeworkId: string; studentId: string; studentName: string; submittedAt: string; }
 
 interface StudentDashboardProps { currentPage: string; }
 
 const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ currentPage }, ref) => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [showSubmitPanel, setShowSubmitPanel] = useState(false);
+  const [selectedHomework, setSelectedHomework] = useState<Homework | null>(null);
+  const [submissionText, setSubmissionText] = useState('');
+  const [submissionLink, setSubmissionLink] = useState('');
+  const [complaintSubject, setComplaintSubject] = useState('');
+  const [complaintMessage, setComplaintMessage] = useState('');
   const [homework, setHomework] = useState<Homework[]>([]);
   const [mySubmissions, setMySubmissions] = useState<Submission[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [grades, setGrades] = useState<GradeRecord[]>([]);
   const [schoolAnnouncements, setSchoolAnnouncements] = useState<Announcement[]>([]);
   const [classAnnouncements, setClassAnnouncements] = useState<ClassAnnouncement[]>([]);
+  const [myComplaints, setMyComplaints] = useState<Complaint[]>([]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -35,7 +49,8 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
       dbListen(`attendance/${user.id}`, (data) => setAttendance(data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })) : [])),
       dbListen(`grades/${user.id}`, (data) => setGrades(data ? Object.entries(data).map(([id, g]: [string, any]) => ({ id, ...g })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [])),
       dbListen('announcements', (data) => setSchoolAnnouncements(data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [])),
-      dbListen('classAnnouncements', (data) => setClassAnnouncements(data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })).filter((a: ClassAnnouncement) => a.classId === user?.classId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []))
+      dbListen('classAnnouncements', (data) => setClassAnnouncements(data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })).filter((a: ClassAnnouncement) => a.classId === user?.classId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [])),
+      dbListen('complaints', (data) => setMyComplaints(data ? Object.entries(data).map(([id, c]: [string, any]) => ({ id, ...c })).filter((c: Complaint) => c.studentId === user?.id).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : []))
     ];
     return () => unsubs.forEach(u => u());
   }, [user?.id, user?.classId]);
@@ -53,9 +68,97 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
 
   const isSubmitted = (hwId: string) => mySubmissions.some(s => s.homeworkId === hwId);
 
-  const handleSubmitHomework = async (hw: Homework) => {
-    await dbPush('submissions', { homeworkId: hw.id, studentId: user?.id, studentName: user?.name, submittedAt: new Date().toISOString(), status: 'submitted' });
+  const handleSubmitHomework = (hw: Homework) => {
+    setSelectedHomework(hw);
+    setSubmissionText('');
+    setSubmissionLink('');
+    setShowSubmitPanel(true);
   };
+
+  const handleConfirmSubmit = async () => {
+    if (!selectedHomework) return;
+    
+    if (!submissionText && !submissionLink) {
+      toast({ title: "Error", description: "Please add some text or a link", variant: "destructive" });
+      return;
+    }
+
+    await dbPush('submissions', {
+      homeworkId: selectedHomework.id,
+      studentId: user?.id,
+      studentName: user?.name,
+      submittedAt: new Date().toISOString(),
+      status: 'submitted',
+      content: submissionText,
+      link: submissionLink
+    });
+    
+    setShowSubmitPanel(false);
+    toast({ title: "Success", description: "Homework submitted successfully" });
+  };
+
+  const handleSubmitComplaint = async () => {
+    if (!complaintMessage) {
+      toast({ title: "Error", description: "Please enter a message", variant: "destructive" });
+      return;
+    }
+    await dbPush('complaints', {
+      studentId: user?.id,
+      studentName: user?.name,
+      classId: user?.classId,
+      className: user?.className,
+      subject: "Chat Message",
+      message: complaintMessage,
+      createdAt: new Date().toISOString(),
+      status: 'sent',
+      read: false,
+      sender: 'student'
+    });
+    setComplaintMessage('');
+  };
+
+  const submissionPanel = (
+    <SlidePanel
+      isOpen={showSubmitPanel}
+      onClose={() => setShowSubmitPanel(false)}
+      title="Submit Homework"
+    >
+      <div className="space-y-6">
+        {selectedHomework && (
+          <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+             <h4 className="font-semibold">{selectedHomework.title}</h4>
+             <p className="text-sm text-muted-foreground mt-1">{selectedHomework.subject} • Due {new Date(selectedHomework.dueDate).toLocaleDateString()}</p>
+             <p className="text-sm mt-2">{selectedHomework.description}</p>
+          </div>
+        )}
+        
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-muted-foreground">Your Work / Answer</label>
+          <Textarea
+            placeholder="Type your homework answer here..."
+            className="min-h-[200px] resize-none"
+            value={submissionText}
+            onChange={(e) => setSubmissionText(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-muted-foreground">Attachments / Link</label>
+          <Input
+            placeholder="Paste a link to your work (Google Docs, Drive, etc.)"
+            value={submissionLink}
+            onChange={(e) => setSubmissionLink(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">Paste a link to your document, presentation, or file.</p>
+        </div>
+
+        <Button className="w-full bg-gradient-primary" onClick={handleConfirmSubmit}>
+          <Upload className="w-4 h-4 mr-2" />
+          Submit Assignment
+        </Button>
+      </div>
+    </SlidePanel>
+  );
 
   const stats = getAttendanceStats();
   const upcomingHomework = getUpcomingHomework();
@@ -76,6 +179,8 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
       </CardContent>
     </Card>
   );
+
+  if (currentPage === 'schedule') return <div ref={ref}><TimetablePanel currentPage={currentPage} /></div>;
 
   if (currentPage === 'dashboard') {
     return (
@@ -287,6 +392,114 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
             );
           })}
           {homework.length === 0 && <Card><CardContent className="p-12 text-center text-muted-foreground">No homework assigned</CardContent></Card>}
+        </div>
+        {submissionPanel}
+      </div>
+    );
+  }
+
+  if (currentPage === 'complaints') {
+    return (
+      <div ref={ref} className="h-[calc(100vh-120px)] flex flex-col bg-[#efeae2] dark:bg-background rounded-2xl overflow-hidden shadow-2xl border border-border/50 relative">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-[0.06] pointer-events-none bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat"></div>
+        
+        {/* Header */}
+        <div className="h-16 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/50 flex items-center justify-between px-4 z-10 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <Megaphone className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-sm">Principal</span>
+              <span className="text-xs text-muted-foreground">School Administration</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto p-4 z-0 space-y-4">
+          <div className="flex justify-center mb-4">
+             <span className="bg-background/80 backdrop-blur-sm px-3 py-1 rounded-lg text-[10px] text-muted-foreground shadow-sm border border-border/50 uppercase tracking-wider font-medium">
+               Today
+             </span>
+          </div>
+
+          {/* Welcome Message (System) */}
+          <div className="flex justify-start">
+            <div className="max-w-[70%] bg-white dark:bg-muted p-3 rounded-2xl rounded-tl-none shadow-sm relative group">
+              <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground/90">Hello {user?.name}, how can we help you today? Feel free to send a message to the Principal.</p>
+              <div className="flex justify-end items-center gap-1 mt-1">
+                <span className="text-[10px] text-muted-foreground/80">System</span>
+              </div>
+            </div>
+          </div>
+
+          {/* User Messages */}
+          {myComplaints.map((msg) => (
+            <div key={msg.id} className={`flex ${msg.sender === 'admin' ? 'justify-start' : 'justify-end'}`}>
+              <div className={`max-w-[70%] p-3 rounded-2xl shadow-sm relative group ${
+                msg.sender === 'admin' 
+                  ? 'bg-white dark:bg-muted rounded-tl-none' 
+                  : 'bg-[#d9fdd3] dark:bg-primary/20 rounded-tr-none'
+              }`}>
+                <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground/90">{msg.message}</p>
+                <div className="flex justify-end items-center gap-1 mt-1">
+                  <span className="text-[10px] text-muted-foreground/80">
+                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {msg.sender !== 'admin' && (
+                    msg.status === 'read' || msg.status === 'resolved' ? (
+                      <div className="flex -space-x-1">
+                        <Check className="w-3 h-3 text-blue-500" />
+                        <Check className="w-3 h-3 text-blue-500" />
+                      </div>
+                    ) : (
+                      <Check className="w-3 h-3 text-muted-foreground" />
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          {myComplaints.length === 0 && (
+            <div className="flex justify-center mt-8">
+              <span className="text-xs text-muted-foreground bg-background/50 px-3 py-1 rounded-full">No messages yet</span>
+            </div>
+          )}
+        </div>
+
+        {/* Input Area */}
+        <div className="p-3 bg-background border-t border-border/50 z-10 flex gap-2 items-center shrink-0">
+          <Input 
+            placeholder="Type a message..." 
+            className="flex-1 bg-muted/30 border-0 focus-visible:ring-1 min-h-[44px]" 
+            value={complaintMessage}
+            onChange={(e) => setComplaintMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (complaintMessage.trim()) {
+                  handleSubmitComplaint();
+                }
+              }
+            }}
+          />
+          <Button 
+            className="h-11 w-11 rounded-full bg-gradient-primary shrink-0" 
+            size="icon"
+            onClick={() => {
+              if (!complaintMessage.trim()) {
+                toast({ title: "Error", description: "Please type a message", variant: "destructive" });
+                return;
+              }
+              handleSubmitComplaint();
+            }}
+            disabled={!complaintMessage.trim()}
+          >
+            <Send className="w-5 h-5 text-white" />
+          </Button>
         </div>
       </div>
     );
