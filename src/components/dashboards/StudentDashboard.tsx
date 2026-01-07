@@ -411,8 +411,7 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
               <Megaphone className="w-5 h-5 text-primary" />
             </div>
             <div className="flex flex-col">
-              <span className="font-semibold text-sm">Principal</span>
-              <span className="text-xs text-muted-foreground">School Administration</span>
+              <span className="font-semibold text-sm">Admin</span>
             </div>
           </div>
         </div>
@@ -428,7 +427,7 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
           {/* Welcome Message (System) */}
           <div className="flex justify-start">
             <div className="max-w-[70%] bg-white dark:bg-muted p-3 rounded-2xl rounded-tl-none shadow-sm relative group">
-              <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground/90">Hello {user?.name}, how can we help you today? Feel free to send a message to the Principal.</p>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed text-foreground/90">Hello {user?.name}, how can we help you today? Feel free to send a message to the Admin.</p>
               <div className="flex justify-end items-center gap-1 mt-1">
                 <span className="text-[10px] text-muted-foreground/80">System</span>
               </div>
