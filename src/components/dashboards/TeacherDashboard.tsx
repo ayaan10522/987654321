@@ -37,6 +37,7 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
   const [expandedHomework, setExpandedHomework] = useState<string | null>(null);
   const [newHomework, setNewHomework] = useState({ title: '', description: '', dueDate: '', classId: '', subject: '' });
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', classId: '' });
+  const [newStudent, setNewStudent] = useState({ name: '', username: '', password: '', classId: '' });
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
   const [existingAttendance, setExistingAttendance] = useState<Record<string, AttendanceRecord>>({});
@@ -107,6 +108,22 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
     await dbPush('classAnnouncements', { ...newAnnouncement, className: cls?.name || '', teacherId: user?.id, teacherName: user?.name, createdAt: new Date().toISOString() });
     setNewAnnouncement({ title: '', content: '', classId: '' });
     toast({ title: "Success", description: "Announcement posted" });
+  };
+
+  const handleAddStudent = async () => {
+    if (!newStudent.name || !newStudent.username || !newStudent.password || !newStudent.classId) {
+      toast({ title: "Error", description: "Please fill all fields", variant: "destructive" });
+      return;
+    }
+    const cls = myClasses.find(c => c.id === newStudent.classId);
+    if (!cls) {
+      toast({ title: "Error", description: "Invalid class", variant: "destructive" });
+      return;
+    }
+    await dbPush('students', { ...newStudent, className: cls.name, createdAt: new Date().toISOString() });
+    setNewStudent({ name: '', username: '', password: '', classId: '' });
+    setShowPanel(null);
+    toast({ title: "Success", description: "Student enrolled successfully" });
   };
 
   const handleMarkAttendance = (studentId: string, status: 'present' | 'absent') => setAttendance(prev => ({ ...prev, [studentId]: status }));
@@ -479,11 +496,65 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
                     {classStudents.slice(0, 3).map(s => (<div key={s.id} className="flex items-center gap-2 text-sm text-muted-foreground"><div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium">{s.name.charAt(0)}</div>{s.name}</div>))}
                     {classStudents.length > 3 && <p className="text-xs text-muted-foreground">+{classStudents.length - 3} more</p>}
                   </div>
+                  <Button
+                    className="mt-4 w-full bg-gradient-primary"
+                    onClick={() => {
+                      setNewStudent({ name: '', username: '', password: '', classId: cls.id });
+                      setShowPanel('student');
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Student
+                  </Button>
                 </CardContent>
               </Card>
             );
           })}
         </div>
+        <SlidePanel
+          isOpen={showPanel === 'student'}
+          onClose={() => setShowPanel(null)}
+          title="Enroll New Student"
+        >
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+              <Input
+                placeholder="Student's full name"
+                value={newStudent.name}
+                onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Username</label>
+              <Input
+                placeholder="Login username"
+                value={newStudent.username}
+                onChange={(e) => setNewStudent({ ...newStudent, username: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Password</label>
+              <Input
+                type="password"
+                placeholder="Set password"
+                value={newStudent.password}
+                onChange={(e) => setNewStudent({ ...newStudent, password: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Class</label>
+              <Input
+                value={myClasses.find(c => c.id === newStudent.classId)?.name || ''}
+                disabled
+              />
+            </div>
+            <Button className="w-full bg-gradient-primary" onClick={handleAddStudent}>
+              <Save className="w-4 h-4 mr-2" />
+              Enroll Student
+            </Button>
+          </div>
+        </SlidePanel>
       </div>
     );
   }
