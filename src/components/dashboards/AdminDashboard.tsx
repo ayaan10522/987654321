@@ -12,7 +12,8 @@ import SettingsPanel from './SettingsPanel';
 import { 
   Users, GraduationCap, BookOpen, Plus, Trash2, Check, 
   Megaphone, Send, TrendingUp, Award, Search,
-  UserPlus, School, Bell, Calendar, Clock, ChevronRight, Save, MoreVertical, Cog, Lock
+  UserPlus, School, Bell, Calendar, Clock, ChevronRight, Save, MoreVertical, Cog, Lock,
+  Download, Upload
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -81,6 +82,9 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
     if (!newTeacher.name || !newTeacher.username || !newTeacher.password || !newTeacher.subject) {
       toast({ title: "Error", description: "Please fill all fields", variant: "destructive" }); return;
     }
+    if (teachers.some(t => t.username === newTeacher.username)) {
+      toast({ title: "Error", description: "Username already exists", variant: "destructive" }); return;
+    }
     await dbPush('teachers', { ...newTeacher, createdAt: new Date().toISOString() });
     setNewTeacher({ name: '', username: '', password: '', subject: '' });
     toast({ title: "Success", description: "Teacher added successfully" });
@@ -143,6 +147,9 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
     if (!newStudent.name || !newStudent.username || !newStudent.password || !newStudent.classId) {
       toast({ title: "Error", description: "Please fill all fields", variant: "destructive" }); return;
     }
+    if (students.some(s => s.username === newStudent.username)) {
+      toast({ title: "Error", description: "Username already exists", variant: "destructive" }); return;
+    }
     const cls = classes.find(c => c.id === newStudent.classId);
     await dbPush('students', { ...newStudent, className: cls?.name || 'Unassigned', createdAt: new Date().toISOString() });
     setNewStudent({ name: '', username: '', password: '', classId: '' });
@@ -156,6 +163,118 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
     await dbPush('announcements', { ...newAnnouncement, author: 'Principal', createdAt: new Date().toISOString() });
     setNewAnnouncement({ title: '', content: '', priority: 'normal' });
     toast({ title: "Success", description: "Announcement posted" });
+  };
+
+  const handleExportData = (data: any[], filename: string) => {
+    if (data.length === 0) {
+      toast({ title: "Error", description: "No data to export", variant: "destructive" });
+      return;
+    }
+    const headers = Object.keys(data[0]).filter(k => k !== 'id').join(',');
+    const rows = data.map(obj => 
+      Object.entries(obj)
+        .filter(([k]) => k !== 'id')
+        .map(([, v]) => `"${String(v).replace(/"/g, '""')}"`)
+        .join(',')
+    );
+    const csvContent = [headers, ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImportTeachers = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split('\n');
+      if (lines.length < 2) return;
+
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const importedTeachers = lines.slice(1).filter(line => line.trim()).map(line => {
+        const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const teacher: any = {};
+        headers.forEach((header, i) => {
+          teacher[header] = values[i];
+        });
+        return teacher;
+      });
+
+      let count = 0;
+      let skipped = 0;
+      for (const t of importedTeachers) {
+        if (t.name && t.username && t.password && t.subject) {
+          if (teachers.some(existing => existing.username === t.username)) {
+            skipped++;
+            continue;
+          }
+          await dbPush('teachers', { ...t, createdAt: new Date().toISOString() });
+          count++;
+        }
+      }
+      toast({ 
+        title: "Import Complete", 
+        description: `Imported ${count} teachers.${skipped > 0 ? ` Skipped ${skipped} duplicates.` : ''}` 
+      });
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImportStudents = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split('\n');
+      if (lines.length < 2) return;
+
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const importedStudents = lines.slice(1).filter(line => line.trim()).map(line => {
+        const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const student: any = {};
+        headers.forEach((header, i) => {
+          student[header] = values[i];
+        });
+        return student;
+      });
+
+      let count = 0;
+      let skipped = 0;
+      for (const s of importedStudents) {
+        if (s.name && s.username && s.password && (s.classId || s.className)) {
+          if (students.some(existing => existing.username === s.username)) {
+            skipped++;
+            continue;
+          }
+          const cls = classes.find(c => c.id === s.classId || c.name === s.className);
+          await dbPush('students', { 
+            ...s, 
+            classId: cls?.id || s.classId || '',
+            className: cls?.name || s.className || 'Unassigned',
+            createdAt: new Date().toISOString() 
+          });
+          count++;
+        }
+      }
+      toast({ 
+        title: "Import Complete", 
+        description: `Imported ${count} students.${skipped > 0 ? ` Skipped ${skipped} duplicates.` : ''}` 
+      });
+      e.target.value = '';
+    };
+    reader.readAsText(file);
   };
 
   const handleSendReply = async () => {
@@ -603,7 +722,14 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
           <div><h3 className="text-2xl font-display font-bold">Teachers</h3><p className="text-muted-foreground">Manage teaching staff</p></div>
           <div className="flex gap-3 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder="Search..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-            <Button className="bg-gradient-primary" onClick={() => setShowPanel('teacher')}><Plus className="w-4 h-4 mr-2" />Add</Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="icon" onClick={() => handleExportData(teachers, 'teachers')} title="Export Teachers"><Download className="w-4 h-4" /></Button>
+              <div className="relative">
+                <input type="file" accept=".csv" className="hidden" id="import-teachers" onChange={handleImportTeachers} />
+                <Button variant="outline" size="icon" onClick={() => document.getElementById('import-teachers')?.click()} title="Import Teachers"><Upload className="w-4 h-4" /></Button>
+              </div>
+              <Button className="bg-gradient-primary" onClick={() => setShowPanel('teacher')}><Plus className="w-4 h-4 mr-2" />Add</Button>
+            </div>
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -805,7 +931,14 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
           <div><h3 className="text-2xl font-display font-bold">Students</h3><p className="text-muted-foreground">Manage enrolled students</p></div>
           <div className="flex gap-3 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder="Search..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-            <Button className="bg-gradient-primary" onClick={() => setShowPanel('student')}><Plus className="w-4 h-4 mr-2" />Enroll</Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="icon" onClick={() => handleExportData(students, 'students')} title="Export Students"><Download className="w-4 h-4" /></Button>
+              <div className="relative">
+                <input type="file" accept=".csv" className="hidden" id="import-students" onChange={handleImportStudents} />
+                <Button variant="outline" size="icon" onClick={() => document.getElementById('import-students')?.click()} title="Import Students"><Upload className="w-4 h-4" /></Button>
+              </div>
+              <Button className="bg-gradient-primary" onClick={() => setShowPanel('student')}><Plus className="w-4 h-4 mr-2" />Enroll</Button>
+            </div>
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

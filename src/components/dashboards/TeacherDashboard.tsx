@@ -12,7 +12,8 @@ import SettingsPanel from './SettingsPanel';
 import { 
   Check, X, Plus, BookOpen, Calendar, FileText, ClipboardCheck, 
   Send, Users, Clock, AlertCircle, CheckCircle2, Megaphone, Trash2,
-  TrendingUp, UserCheck, UserX, ChevronDown, ChevronUp, Save, Eye, Link, ExternalLink
+  TrendingUp, UserCheck, UserX, ChevronDown, ChevronUp, Save, Eye, Link, ExternalLink,
+  Download, Upload
 } from 'lucide-react';
 
 interface Student { id: string; name: string; classId: string; className: string; }
@@ -115,6 +116,10 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
       toast({ title: "Error", description: "Please fill all fields", variant: "destructive" });
       return;
     }
+    if (students.some(s => s.username === newStudent.username)) {
+      toast({ title: "Error", description: "Username already exists", variant: "destructive" });
+      return;
+    }
     const cls = myClasses.find(c => c.id === newStudent.classId);
     if (!cls) {
       toast({ title: "Error", description: "Invalid class", variant: "destructive" });
@@ -124,6 +129,80 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
     setNewStudent({ name: '', username: '', password: '', classId: '' });
     setShowPanel(null);
     toast({ title: "Success", description: "Student enrolled successfully" });
+  };
+
+  const handleExportStudents = (classId: string, className: string) => {
+    const classStudents = students.filter(s => s.classId === classId);
+    if (classStudents.length === 0) {
+      toast({ title: "Error", description: "No students in this class", variant: "destructive" });
+      return;
+    }
+    const headers = Object.keys(classStudents[0]).filter(k => k !== 'id').join(',');
+    const rows = classStudents.map(obj => 
+      Object.entries(obj)
+        .filter(([k]) => k !== 'id')
+        .map(([, v]) => `"${String(v).replace(/"/g, '""')}"`)
+        .join(',')
+    );
+    const csvContent = [headers, ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `students_${className.replace(/\s+/g, '_')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImportStudents = (e: React.ChangeEvent<HTMLInputElement>, classId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const cls = myClasses.find(c => c.id === classId);
+    if (!cls) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      const lines = text.split('\n');
+      if (lines.length < 2) return;
+
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const importedStudents = lines.slice(1).filter(line => line.trim()).map(line => {
+        const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const student: any = {};
+        headers.forEach((header, i) => {
+          student[header] = values[i];
+        });
+        return student;
+      });
+
+      let count = 0;
+      let skipped = 0;
+      for (const s of importedStudents) {
+        if (s.name && s.username && s.password) {
+          if (students.some(existing => existing.username === s.username)) {
+            skipped++;
+            continue;
+          }
+          await dbPush('students', { 
+            ...s, 
+            classId,
+            className: cls.name,
+            createdAt: new Date().toISOString() 
+          });
+          count++;
+        }
+      }
+      toast({ 
+        title: "Import Complete", 
+        description: `Imported ${count} students to ${cls.name}.${skipped > 0 ? ` Skipped ${skipped} duplicates.` : ''}` 
+      });
+      e.target.value = '';
+    };
+    reader.readAsText(file);
   };
 
   const handleMarkAttendance = (studentId: string, status: 'present' | 'absent') => setAttendance(prev => ({ ...prev, [studentId]: status }));
@@ -496,16 +575,23 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
                     {classStudents.slice(0, 3).map(s => (<div key={s.id} className="flex items-center gap-2 text-sm text-muted-foreground"><div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium">{s.name.charAt(0)}</div>{s.name}</div>))}
                     {classStudents.length > 3 && <p className="text-xs text-muted-foreground">+{classStudents.length - 3} more</p>}
                   </div>
-                  <Button
-                    className="mt-4 w-full bg-gradient-primary"
-                    onClick={() => {
-                      setNewStudent({ name: '', username: '', password: '', classId: cls.id });
-                      setShowPanel('student');
-                    }}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Student
-                  </Button>
+                  <div className="flex gap-2 mt-4">
+                    <Button
+                      className="flex-1 bg-gradient-primary"
+                      onClick={() => {
+                        setNewStudent({ name: '', username: '', password: '', classId: cls.id });
+                        setShowPanel('student');
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Student
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={() => handleExportStudents(cls.id, cls.name)} title="Export Students"><Download className="w-4 h-4" /></Button>
+                    <div className="relative">
+                      <input type="file" accept=".csv" className="hidden" id={`import-students-${cls.id}`} onChange={(e) => handleImportStudents(e, cls.id)} />
+                      <Button variant="outline" size="icon" onClick={() => document.getElementById(`import-students-${cls.id}`)?.click()} title="Import Students"><Upload className="w-4 h-4" /></Button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             );

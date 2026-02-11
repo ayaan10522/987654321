@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import SlidePanel from '@/components/ui/SlidePanel';
 import TimetablePanel from './TimetablePanel';
+import SettingsPanel from './SettingsPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { dbListen, dbPush } from '@/lib/firebase';
@@ -564,6 +565,8 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
       </div>
     );
   }
+
+  if (currentPage === 'settings') return <div ref={ref}><SettingsPanel currentPage={currentPage} /></div>;
 
   return <div ref={ref} className="text-center py-16 text-muted-foreground">Select a section</div>;
 });

@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { dbUpdate } from '@/lib/firebase';
+import { dbUpdate, dbGet } from '@/lib/firebase';
 import { 
-  User, Lock, Bell, Palette, Globe, Shield, 
-  Save, Moon, Sun, Monitor, Check
+  User as UserIcon, Lock, Bell, Palette, Globe, Shield, 
+  Save, Moon, Sun, Monitor, Check, AlertTriangle
 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -17,6 +17,7 @@ interface SettingsPanelProps {
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ currentPage }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [dbUser, setDbUser] = useState<any>(null);
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     email: '',
@@ -35,12 +36,31 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ currentPage }) => {
   });
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
 
+  useEffect(() => {
+    const fetchUser = async () => {
+      if (!user) return;
+      const path = user.role === 'admin' ? `users/${user.id}` : 
+                   user.role === 'teacher' ? `teachers/${user.id}` : 
+                   `students/${user.id}`;
+      const data = await dbGet(path);
+      setDbUser(data);
+      if (data) {
+        setProfileData({
+          name: data.name || user.name || '',
+          email: data.email || '',
+          phone: data.phone || ''
+        });
+      }
+    };
+    fetchUser();
+  }, [user]);
+
   const handleSaveProfile = async () => {
     try {
       const path = user?.role === 'admin' ? `users/${user.id}` : 
                    user?.role === 'teacher' ? `teachers/${user.id}` : 
                    `students/${user.id}`;
-      await dbUpdate(path, { name: profileData.name });
+      await dbUpdate(path, { ...profileData });
       toast({ title: "Success", description: "Profile updated successfully" });
     } catch (error) {
       toast({ title: "Error", description: "Failed to update profile", variant: "destructive" });
@@ -48,21 +68,51 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ currentPage }) => {
   };
 
   const handleChangePassword = async () => {
+    if (!dbUser) return;
+
+    if (dbUser.passwordChanged) {
+      toast({ 
+        title: "Permission Denied", 
+        description: "You have already changed your password once. Contact admin to reset it.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (passwordData.currentPassword !== dbUser.password) {
+      toast({ title: "Error", description: "Current password is incorrect", variant: "destructive" });
+      return;
+    }
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast({ title: "Error", description: "Passwords don't match", variant: "destructive" });
       return;
     }
+
     if (passwordData.newPassword.length < 6) {
       toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
       return;
     }
+
+    if (passwordData.newPassword === dbUser.password || passwordData.newPassword === dbUser.oldPassword) {
+      toast({ title: "Error", description: "New password cannot be the same as old password", variant: "destructive" });
+      return;
+    }
+
     try {
       const path = user?.role === 'admin' ? `users/${user.id}` : 
                    user?.role === 'teacher' ? `teachers/${user.id}` : 
                    `students/${user.id}`;
-      await dbUpdate(path, { password: passwordData.newPassword });
+      
+      await dbUpdate(path, { 
+        password: passwordData.newPassword,
+        oldPassword: dbUser.password,
+        passwordChanged: true
+      });
+
+      setDbUser({ ...dbUser, password: passwordData.newPassword, oldPassword: dbUser.password, passwordChanged: true });
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      toast({ title: "Success", description: "Password changed successfully" });
+      toast({ title: "Success", description: "Password changed successfully. You cannot change it again." });
     } catch (error) {
       toast({ title: "Error", description: "Failed to change password", variant: "destructive" });
     }
@@ -90,7 +140,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ currentPage }) => {
         <div className="h-1.5 bg-gradient-primary" />
         <CardHeader>
           <CardTitle className="font-display flex items-center gap-2">
-            <User className="w-5 h-5 text-primary" />
+            <UserIcon className="w-5 h-5 text-primary" />
             Profile Information
           </CardTitle>
         </CardHeader>
