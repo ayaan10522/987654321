@@ -306,6 +306,7 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
   const [targetClassId, setTargetClassId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedUser, setSelectedUser] = useState<{ id: string, name: string, role: 'teacher' | 'student' } | null>(null);
+  const [editingUser, setEditingUser] = useState<{ id: string, name: string, username: string, password: string, role: 'teacher' | 'student', subject?: string, classId?: string } | null>(null);
   const [newPassword, setNewPassword] = useState('');
 
   const handleUpdatePassword = async () => {
@@ -322,6 +323,45 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
       setShowPanel(null);
       setSelectedUser(null);
       setNewPassword('');
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
+    if (!editingUser.name || !editingUser.username || !editingUser.password) {
+      toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const path = editingUser.role === 'teacher' ? `teachers/${editingUser.id}` : `students/${editingUser.id}`;
+      const updateData: any = {
+        name: editingUser.name,
+        username: editingUser.username,
+        password: editingUser.password
+      };
+
+      if (editingUser.role === 'teacher' && editingUser.subject) {
+        updateData.subject = editingUser.subject;
+      }
+      
+      if (editingUser.role === 'student' && editingUser.classId) {
+        const targetClass = classes.find(c => c.id === editingUser.classId);
+        if (targetClass) {
+          updateData.classId = targetClass.id;
+          updateData.className = targetClass.name;
+        }
+      }
+
+      await dbUpdate(path, updateData);
+      toast({ title: "Success", description: `${editingUser.role === 'teacher' ? 'Teacher' : 'Student'} updated successfully` });
+      setShowPanel(null);
+      setEditingUser(null);
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -826,6 +866,81 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
           </div>
         </SlidePanel>
 
+        <SlidePanel 
+          isOpen={showPanel === 'edit-user'} 
+          onClose={() => { setShowPanel(null); setEditingUser(null); }} 
+          title={`Edit ${editingUser?.role === 'teacher' ? 'Teacher' : 'Student'} Details`}
+        >
+          {editingUser && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+                <Input 
+                  placeholder="Enter full name" 
+                  value={editingUser.name} 
+                  onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })} 
+                />
+              </div>
+              
+              {editingUser.role === 'teacher' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Subject</label>
+                  <Input 
+                    placeholder="Teaching subject" 
+                    value={editingUser.subject || ''} 
+                    onChange={(e) => setEditingUser({ ...editingUser, subject: e.target.value })} 
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Username</label>
+                <Input 
+                  placeholder="Login username" 
+                  value={editingUser.username} 
+                  onChange={(e) => setEditingUser({ ...editingUser, username: e.target.value })} 
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Password</label>
+                <Input 
+                  type="text" 
+                  placeholder="Set password" 
+                  value={editingUser.password} 
+                  onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })} 
+                />
+                <p className="text-xs text-muted-foreground italic">Password is visible for admin editing.</p>
+              </div>
+
+              {editingUser.role === 'student' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Class</label>
+                  <select 
+                    className="w-full h-10 px-3 rounded-lg border border-input bg-background" 
+                    value={editingUser.classId || ''} 
+                    onChange={(e) => setEditingUser({ ...editingUser, classId: e.target.value })}
+                  >
+                    <option value="">Select a class</option>
+                    {classes.map(c => <option key={c.id} value={c.id}>{c.name} (Grade {c.grade})</option>)}
+                  </select>
+                </div>
+              )}
+
+              <div className="pt-4">
+                <Button 
+                  className="w-full bg-gradient-primary h-11 rounded-xl shadow-lg" 
+                  onClick={handleUpdateUser}
+                  disabled={isSubmitting}
+                >
+                  <Save className="w-4 h-4 mr-2" /> 
+                  {isSubmitting ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </SlidePanel>
+
         <SlidePanel isOpen={showPanel === 'popup'} onClose={() => setShowPanel(null)} title="Social Media Popup Settings">
           <div className="space-y-6">
             <div className="p-4 rounded-2xl bg-muted/50 border border-border/50 space-y-4">
@@ -944,6 +1059,12 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
                       <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => {
+                        setEditingUser({ ...t, role: 'teacher' });
+                        setShowPanel('edit-user');
+                      }}>
+                        <Cog className="w-4 h-4 mr-2" /> Edit Details
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => {
                         setSelectedUser({ id: t.id, name: t.name, role: 'teacher' });
                         setShowPanel('change-password');
@@ -1202,6 +1323,12 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
                       <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => {
+                        setEditingUser({ ...s, role: 'student' });
+                        setShowPanel('edit-user');
+                      }}>
+                        <Cog className="w-4 h-4 mr-2" /> Edit Details
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleGraduateStudent(s)}>
                         <TrendingUp className="w-4 h-4 mr-2 text-green-500" /> Graduate
                       </DropdownMenuItem>

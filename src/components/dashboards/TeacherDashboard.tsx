@@ -16,7 +16,7 @@ import {
   Download, Upload
 } from 'lucide-react';
 
-interface Student { id: string; name: string; classId: string; className: string; }
+interface Student { id: string; name: string; classId: string; className: string; username: string; }
 interface Class { id: string; name: string; grade: string; teacherId: string; secondaryTeachers?: { id: string; name: string }[]; }
 interface Homework { id: string; title: string; description: string; dueDate: string; classId: string; className: string; subject: string; createdAt: string; }
 interface AttendanceRecord { id: string; studentId: string; date: string; status: 'present' | 'absent'; classId: string; }
@@ -180,19 +180,28 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
       const lines = text.split('\n');
       if (lines.length < 2) return;
 
-      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
       const importedStudents = lines.slice(1).filter(line => line.trim()).map(line => {
         const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
         const student: any = {};
         headers.forEach((header, i) => {
-          student[header] = values[i];
+          if (header) {
+            student[header] = values[i];
+          }
         });
         return student;
       });
 
+      // Map common field names to expected keys
+      const normalizedStudents = importedStudents.map(s => ({
+        name: s.name || s.fullname || s['full name'] || '',
+        username: s.username || s.user || '',
+        password: s.password || s.pass || '123456', // Default password if missing
+      }));
+
       // Filter out duplicates within the Excel/CSV file itself
-      const uniqueImportedStudents = importedStudents.filter((s, index, self) =>
-        index === self.findIndex((temp) => temp.username === s.username)
+      const uniqueImportedStudents = normalizedStudents.filter((s, index, self) =>
+        s.username && index === self.findIndex((temp) => temp.username === s.username)
       );
 
       let count = 0;
