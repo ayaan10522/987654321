@@ -70,7 +70,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ currentPage }) => {
   const handleChangePassword = async () => {
     if (!dbUser) return;
 
-    if (dbUser.passwordChanged) {
+    if (user?.role !== 'admin' && dbUser.passwordChanged) {
       toast({ 
         title: "Permission Denied", 
         description: "You have already changed your password once. Contact admin to reset it.", 
@@ -94,7 +94,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ currentPage }) => {
       return;
     }
 
-    if (passwordData.newPassword === dbUser.password || passwordData.newPassword === dbUser.oldPassword) {
+    if (user?.role !== 'admin' && (passwordData.newPassword === dbUser.password || passwordData.newPassword === dbUser.oldPassword)) {
       toast({ title: "Error", description: "New password cannot be the same as old password", variant: "destructive" });
       return;
     }

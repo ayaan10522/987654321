@@ -17,7 +17,7 @@ import {
 
 interface Homework { id: string; title: string; description: string; dueDate: string; classId: string; className: string; subject: string; createdAt: string; }
 interface AttendanceRecord { id: string; date: string; status: 'present' | 'absent'; }
-interface GradeRecord { id: string; subject: string; grade: string; date: string; teacherName?: string; }
+interface GradeRecord { id: string; subject: string; title?: string; grade: string; date: string; teacherName?: string; }
 interface Announcement { id: string; title: string; content: string; createdAt: string; author?: string; priority?: string; }
 interface ClassAnnouncement { id: string; title: string; content: string; classId: string; className: string; teacherName: string; createdAt: string; }
 interface Complaint { id: string; studentId: string; studentName: string; classId: string; className: string; subject: string; message: string; createdAt: string; status: 'sent' | 'read' | 'resolved'; read: boolean; sender?: 'student' | 'admin'; }
@@ -527,7 +527,11 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
                 <div key={grade.id} className="flex items-center justify-between p-4 hover:bg-muted/30 animate-fade-in" style={{ animationDelay: `${i * 0.03}s` }}>
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center"><Star className="w-6 h-6 text-primary-foreground" /></div>
-                    <div><p className="font-medium">{grade.subject}</p><p className="text-sm text-muted-foreground">{new Date(grade.date).toLocaleDateString()}{grade.teacherName && ` • ${grade.teacherName}`}</p></div>
+                    <div>
+                      <p className="font-bold text-lg">{grade.title || grade.subject}</p>
+                      <p className="text-sm text-muted-foreground">Subject: {grade.subject}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(grade.date).toLocaleDateString()}{grade.teacherName && ` • ${grade.teacherName}`}</p>
+                    </div>
                   </div>
                   <span className="text-3xl font-display font-bold text-primary">{grade.grade}</span>
                 </div>

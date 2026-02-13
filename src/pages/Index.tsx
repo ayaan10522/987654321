@@ -5,6 +5,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import AdminDashboard from '@/components/dashboards/AdminDashboard';
 import TeacherDashboard from '@/components/dashboards/TeacherDashboard';
 import StudentDashboard from '@/components/dashboards/StudentDashboard';
+import SocialMediaPopup from '@/components/SocialMediaPopup';
 
 const AppContent: React.FC = () => {
   const { user, isLoading } = useAuth();
@@ -44,9 +45,12 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <DashboardLayout currentPage={currentPage} onNavigate={setCurrentPage}>
-      {renderDashboard()}
-    </DashboardLayout>
+    <>
+      <DashboardLayout currentPage={currentPage} onNavigate={setCurrentPage}>
+        {renderDashboard()}
+      </DashboardLayout>
+      <SocialMediaPopup />
+    </>
   );
 };
 

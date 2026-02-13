@@ -43,6 +43,8 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
   const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
   const [existingAttendance, setExistingAttendance] = useState<Record<string, AttendanceRecord>>({});
   const [gradeInput, setGradeInput] = useState<Record<string, string>>({});
+  const [gradeTitleInput, setGradeTitleInput] = useState<Record<string, string>>({});
+  const [teacherGrades, setTeacherGrades] = useState<any[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -59,7 +61,16 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
       dbListen('students', (data) => setStudents(data ? Object.entries(data).map(([id, s]: [string, any]) => ({ id, ...s })) : [])),
       dbListen('homework', (data) => setHomework(data ? Object.entries(data).map(([id, h]: [string, any]) => ({ id, ...h })) : [])),
       dbListen('submissions', (data) => setSubmissions(data ? Object.entries(data).map(([id, s]: [string, any]) => ({ id, ...s })) : [])),
-      dbListen('classAnnouncements', (data) => setAnnouncements(data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []))
+      dbListen('classAnnouncements', (data) => setAnnouncements(data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [])),
+      dbListen(`teacherGrades/${user.id}`, (data) => {
+        if (data) {
+          const grades = Object.entries(data).map(([id, g]: [string, any]) => ({ id, ...g }))
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setTeacherGrades(grades);
+        } else {
+          setTeacherGrades([]);
+        }
+      })
     ];
     return () => unsubs.forEach(u => u());
   }, [user?.id, selectedClass]);
@@ -179,9 +190,14 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
         return student;
       });
 
+      // Filter out duplicates within the Excel/CSV file itself
+      const uniqueImportedStudents = importedStudents.filter((s, index, self) =>
+        index === self.findIndex((temp) => temp.username === s.username)
+      );
+
       let count = 0;
       let skipped = 0;
-      for (const s of importedStudents) {
+      for (const s of uniqueImportedStudents) {
         if (s.name && s.username && s.password) {
           if (students.some(existing => existing.username === s.username)) {
             skipped++;
@@ -229,11 +245,32 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
   };
 
   const handleSaveGrade = async (studentId: string, homeworkId: string) => {
-    const grade = gradeInput[`${studentId}-${homeworkId}`];
+    const key = `${studentId}-${homeworkId}`;
+    const grade = gradeInput[key];
+    const title = gradeTitleInput[key] || '';
     if (!grade) { toast({ title: "Error", description: "Enter a grade", variant: "destructive" }); return; }
+    
     const hw = homework.find(h => h.id === homeworkId);
-    await dbPush(`grades/${studentId}`, { subject: hw?.subject || 'Assignment', grade, homeworkId, teacherId: user?.id, teacherName: user?.name, date: new Date().toISOString() });
-    setGradeInput({ ...gradeInput, [`${studentId}-${homeworkId}`]: '' });
+    const student = students.find(s => s.id === studentId);
+    const gradeData = { 
+      subject: hw?.subject || 'Assignment', 
+      title: title || hw?.title || 'Assignment',
+      grade, 
+      homeworkId, 
+      studentId,
+      studentName: student?.name || 'Unknown',
+      teacherId: user?.id, 
+      teacherName: user?.name, 
+      date: new Date().toISOString() 
+    };
+
+    // Save to student's grades
+    await dbPush(`grades/${studentId}`, gradeData);
+    // Save to teacher's grade history
+    await dbPush(`teacherGrades/${user?.id}`, gradeData);
+
+    setGradeInput({ ...gradeInput, [key]: '' });
+    setGradeTitleInput({ ...gradeTitleInput, [key]: '' });
     toast({ title: "Success", description: "Grade saved" });
   };
 
@@ -281,6 +318,7 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
             <CardContent className="space-y-3">
               <Button variant="outline" className="w-full justify-start hover:bg-primary hover:text-primary-foreground" onClick={() => setShowPanel('homework')}><FileText className="w-4 h-4 mr-3" />Assign Homework</Button>
               <Button variant="outline" className="w-full justify-start hover:bg-primary hover:text-primary-foreground" onClick={() => setShowPanel('announcement')}><Megaphone className="w-4 h-4 mr-3" />Post Announcement</Button>
+              <Button variant="outline" className="w-full justify-start hover:bg-primary hover:text-primary-foreground" onClick={() => setShowPanel('grade-history')}><TrendingUp className="w-4 h-4 mr-3" />View Grade History</Button>
             </CardContent>
           </Card>
 
@@ -301,6 +339,31 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
             </CardContent>
           </Card>
         </div>
+
+        <SlidePanel isOpen={showPanel === 'grade-history'} onClose={() => setShowPanel(null)} title="Grade History">
+          <div className="space-y-4">
+            {teacherGrades.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground">No grades given yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {teacherGrades.map((g, i) => (
+                  <div key={g.id || i} className="p-4 rounded-xl bg-muted/50 border border-border/50 animate-fade-in" style={{ animationDelay: `${i * 0.05}s` }}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-bold">{g.title || g.subject}</p>
+                        <p className="text-sm text-muted-foreground">Student: {g.studentName}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(g.date).toLocaleDateString()} {new Date(g.date).toLocaleTimeString()}</p>
+                      </div>
+                      <div className="px-3 py-1 rounded-lg bg-gradient-primary text-primary-foreground font-bold">
+                        {g.grade}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </SlidePanel>
 
         <SlidePanel isOpen={showPanel === 'homework'} onClose={() => setShowPanel(null)} title="Assign Homework">
           <div className="space-y-4">
@@ -500,17 +563,25 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
                 </div>
 
                 <div className="pt-4 border-t border-border">
-                  <label className="text-sm font-medium text-muted-foreground mb-2 block">Grade</label>
-                  <div className="flex gap-2">
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">Grade & Title</label>
+                  <div className="space-y-2">
                     <Input 
-                      placeholder="Enter grade" 
-                      value={gradeInput[`${viewingSubmission.studentId}-${viewingSubmission.homeworkId}`] || viewingSubmission.grade || ''} 
-                      onChange={(e) => setGradeInput({...gradeInput, [`${viewingSubmission.studentId}-${viewingSubmission.homeworkId}`]: e.target.value})} 
+                      placeholder="Title (e.g. Midterm)" 
+                      value={gradeTitleInput[`${viewingSubmission.studentId}-${viewingSubmission.homeworkId}`] || ''} 
+                      onChange={(e) => setGradeTitleInput({...gradeTitleInput, [`${viewingSubmission.studentId}-${viewingSubmission.homeworkId}`]: e.target.value})} 
                     />
-                    <Button onClick={() => {
-                      handleSaveGrade(viewingSubmission.studentId, viewingSubmission.homeworkId);
-                      setViewingSubmission(null);
-                    }}>Save Grade</Button>
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="Enter grade" 
+                        className="flex-1"
+                        value={gradeInput[`${viewingSubmission.studentId}-${viewingSubmission.homeworkId}`] || viewingSubmission.grade || ''} 
+                        onChange={(e) => setGradeInput({...gradeInput, [`${viewingSubmission.studentId}-${viewingSubmission.homeworkId}`]: e.target.value})} 
+                      />
+                      <Button onClick={() => {
+                        handleSaveGrade(viewingSubmission.studentId, viewingSubmission.homeworkId);
+                        setViewingSubmission(null);
+                      }}>Save Grade</Button>
+                    </div>
                   </div>
                 </div>
               </>
@@ -537,14 +608,39 @@ const TeacherDashboard = forwardRef<HTMLDivElement, TeacherDashboardProps>(({ cu
                     <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center"><span className="font-bold text-sm text-primary-foreground">{student.name.charAt(0)}</span></div>
                     <p className="font-medium">{student.name}</p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Input placeholder="Grade" className="w-32" value={gradeInput[student.id] || ''} onChange={(e) => setGradeInput({...gradeInput, [student.id]: e.target.value})} />
-                    <Button className="bg-gradient-primary" onClick={() => {
+                  <div className="flex flex-col md:flex-row items-center gap-3">
+                    <Input 
+                      placeholder="Title (e.g. Quiz 1)" 
+                      className="w-full md:w-40" 
+                      value={gradeTitleInput[student.id] || ''} 
+                      onChange={(e) => setGradeTitleInput({...gradeTitleInput, [student.id]: e.target.value})} 
+                    />
+                    <Input 
+                      placeholder="Grade" 
+                      className="w-full md:w-24" 
+                      value={gradeInput[student.id] || ''} 
+                      onChange={(e) => setGradeInput({...gradeInput, [student.id]: e.target.value})} 
+                    />
+                    <Button className="bg-gradient-primary w-full md:w-auto" onClick={async () => {
                       const grade = gradeInput[student.id];
+                      const title = gradeTitleInput[student.id] || 'General';
                       if (!grade) return;
                       const cls = myClasses.find(c => c.id === selectedClass);
-                      dbPush(`grades/${student.id}`, { subject: 'General', grade, className: cls?.name || '', teacherId: user?.id, teacherName: user?.name, date: new Date().toISOString() });
+                      const gradeData = { 
+                        subject: 'General', 
+                        title,
+                        grade, 
+                        className: cls?.name || '', 
+                        studentId: student.id,
+                        studentName: student.name,
+                        teacherId: user?.id, 
+                        teacherName: user?.name, 
+                        date: new Date().toISOString() 
+                      };
+                      await dbPush(`grades/${student.id}`, gradeData);
+                      await dbPush(`teacherGrades/${user?.id}`, gradeData);
                       setGradeInput({...gradeInput, [student.id]: ''});
+                      setGradeTitleInput({...gradeTitleInput, [student.id]: ''});
                       toast({ title: "Success", description: "Grade saved" });
                     }}><Check className="w-4 h-4" /></Button>
                   </div>

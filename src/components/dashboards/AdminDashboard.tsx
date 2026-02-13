@@ -11,18 +11,13 @@ import AnalyticsPanel from './AnalyticsPanel';
 import SettingsPanel from './SettingsPanel';
 import { 
   Users, GraduationCap, BookOpen, Plus, Trash2, Check, 
-  Megaphone, Send, TrendingUp, Award, Search,
+  Megaphone, Send, TrendingUp, Award, Search, Sparkles,
   UserPlus, School, Bell, Calendar, Clock, ChevronRight, Save, MoreVertical, Cog, Lock,
-  Download, Upload
+  Download, Upload, Shield
 } from 'lucide-react';
-import { 
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 
 interface Teacher { id: string; name: string; username: string; password: string; subject: string; }
 interface Class { id: string; name: string; grade: string; teacherId: string; teacherName: string; secondaryTeachers?: { id: string; name: string }[]; }
@@ -46,6 +41,7 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
   const [newClass, setNewClass] = useState({ name: '', grade: '', teacherId: '' });
   const [newStudent, setNewStudent] = useState({ name: '', username: '', password: '', classId: '' });
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', priority: 'normal' as const });
+  const [popupConfig, setPopupConfig] = useState({ enabled: false, bannerText: '' });
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [manageClass, setManageClass] = useState({ name: '', grade: '', teacherId: '', secondaryTeacherIds: [] as string[] });
   const [secondarySelections, setSecondarySelections] = useState<Record<string, boolean>>({});
@@ -57,7 +53,8 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
       dbListen('classes', (data) => setClasses(data ? Object.entries(data).map(([id, c]: [string, any]) => ({ id, ...c })) : [])),
       dbListen('students', (data) => setStudents(data ? Object.entries(data).map(([id, s]: [string, any]) => ({ id, ...s })) : [])),
       dbListen('announcements', (data) => setAnnouncements(data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [])),
-      dbListen('complaints', (data) => setComplaints(data ? Object.entries(data).map(([id, c]: [string, any]) => ({ id, ...c })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : []))
+      dbListen('complaints', (data) => setComplaints(data ? Object.entries(data).map(([id, c]: [string, any]) => ({ id, ...c })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [])),
+      dbListen('settings/popup', (data) => setPopupConfig(data || { enabled: false, bannerText: '' }))
     ];
     return () => unsubs.forEach(u => u());
   }, []);
@@ -165,13 +162,24 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
     toast({ title: "Success", description: "Announcement posted" });
   };
 
+  const handleUpdatePopupConfig = async () => {
+    await dbUpdate('settings/popup', popupConfig);
+    setShowPanel(null);
+    toast({ title: "Success", description: "Social Media Popup updated" });
+  };
+
   const handleExportData = (data: any[], filename: string) => {
     if (data.length === 0) {
       toast({ title: "Error", description: "No data to export", variant: "destructive" });
       return;
     }
-    const headers = Object.keys(data[0]).filter(k => k !== 'id').join(',');
-    const rows = data.map(obj => 
+
+    // Deduplicate data before exporting to prevent double entries in the CSV
+    // We use username as unique key for teachers/students, and name for classes
+    const uniqueData = Array.from(new Map(data.map(item => [item.username || item.name || item.id, item])).values());
+
+    const headers = Object.keys(uniqueData[0]).filter(k => k !== 'id').join(',');
+    const rows = uniqueData.map(obj => 
       Object.entries(obj)
         .filter(([k]) => k !== 'id')
         .map(([, v]) => `"${String(v).replace(/"/g, '""')}"`)
@@ -209,15 +217,23 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
         return teacher;
       });
 
+      // Filter out duplicates within the Excel/CSV file itself
+      const uniqueImportedTeachers = importedTeachers.filter((t, index, self) =>
+        index === self.findIndex((temp) => temp.username === t.username)
+      );
+
       let count = 0;
       let skipped = 0;
-      for (const t of importedTeachers) {
+      const processedUsernames = new Set(teachers.map(t => t.username));
+
+      for (const t of uniqueImportedTeachers) {
         if (t.name && t.username && t.password && t.subject) {
-          if (teachers.some(existing => existing.username === t.username)) {
+          if (processedUsernames.has(t.username)) {
             skipped++;
             continue;
           }
           await dbPush('teachers', { ...t, createdAt: new Date().toISOString() });
+          processedUsernames.add(t.username);
           count++;
         }
       }
@@ -250,11 +266,18 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
         return student;
       });
 
+      // Filter out duplicates within the Excel/CSV file itself
+      const uniqueImportedStudents = importedStudents.filter((s, index, self) =>
+        index === self.findIndex((temp) => temp.username === s.username)
+      );
+
       let count = 0;
       let skipped = 0;
-      for (const s of importedStudents) {
+      const processedUsernames = new Set(students.map(s => s.username));
+
+      for (const s of uniqueImportedStudents) {
         if (s.name && s.username && s.password && (s.classId || s.className)) {
-          if (students.some(existing => existing.username === s.username)) {
+          if (processedUsernames.has(s.username)) {
             skipped++;
             continue;
           }
@@ -265,6 +288,7 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
             className: cls?.name || s.className || 'Unassigned',
             createdAt: new Date().toISOString() 
           });
+          processedUsernames.add(s.username);
           count++;
         }
       }
@@ -275,6 +299,131 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
       e.target.value = '';
     };
     reader.readAsText(file);
+  };
+
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [promoteAction, setPromoteAction] = useState<'graduate' | 'demote' | null>(null);
+  const [targetClassId, setTargetClassId] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<{ id: string, name: string, role: 'teacher' | 'student' } | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+
+  const handleUpdatePassword = async () => {
+    if (!selectedUser || !newPassword.trim()) return;
+    setIsSubmitting(true);
+    try {
+      const path = selectedUser.role === 'teacher' ? `teachers/${selectedUser.id}` : `students/${selectedUser.id}`;
+      await dbUpdate(path, { 
+        password: newPassword,
+        passwordChanged: false, // Reset so the user can change it again
+        oldPassword: "" // Clear old password history
+      });
+      toast({ title: "Success", description: `Password updated for ${selectedUser.name}` });
+      setShowPanel(null);
+      setSelectedUser(null);
+      setNewPassword('');
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGraduateStudent = async (student: Student) => {
+    setSelectedStudent(student);
+    setPromoteAction('graduate');
+    setShowPanel('promote');
+    // Default to the next grade class if possible
+    const currentClass = classes.find(c => c.id === student.classId);
+    if (currentClass) {
+      const nextGrade = (parseInt(currentClass.grade) + 1).toString();
+      const nextClass = classes.find(c => c.grade === nextGrade);
+      if (nextClass) setTargetClassId(nextClass.id);
+      else setTargetClassId('graduate_out');
+    }
+  };
+
+  const handleDemoteStudent = async (student: Student) => {
+    setSelectedStudent(student);
+    setPromoteAction('demote');
+    setShowPanel('promote');
+    // Default to the previous grade class if possible
+    const currentClass = classes.find(c => c.id === student.classId);
+    if (currentClass) {
+      const prevGrade = (parseInt(currentClass.grade) - 1).toString();
+      const prevClass = classes.find(c => c.grade === prevGrade);
+      if (prevClass) setTargetClassId(prevClass.id);
+    }
+  };
+
+  const handleConfirmPromotion = async () => {
+    if (!selectedStudent || !targetClassId) return;
+    setIsSubmitting(true);
+    try {
+      if (targetClassId === 'graduate_out') {
+        await dbRemove(`students/${selectedStudent.id}`);
+        toast({ title: "Success", description: `${selectedStudent.name} has graduated from the school!` });
+      } else {
+        const targetClass = classes.find(c => c.id === targetClassId);
+        if (!targetClass) throw new Error("Target class not found");
+        
+        await dbUpdate(`students/${selectedStudent.id}`, {
+          classId: targetClass.id,
+          className: targetClass.name
+        });
+        toast({ title: "Success", description: `${selectedStudent.name} ${promoteAction === 'graduate' ? 'graduated' : 'demoted'} to ${targetClass.name}` });
+      }
+      setShowPanel(null);
+      setSelectedStudent(null);
+      setTargetClassId('');
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleExitStudent = async (student: Student) => {
+    if (window.confirm(`Are you sure you want to remove ${student.name} from the school records?`)) {
+      await dbRemove(`students/${student.id}`);
+      toast({ title: "Success", description: `${student.name} has been removed from records` });
+    }
+  };
+
+  const handleCleanupDuplicates = async () => {
+    let cleanedTeachers = 0;
+    let cleanedStudents = 0;
+
+    // Cleanup Teachers
+    const teacherUsernames = new Set();
+    for (const t of teachers) {
+      if (teacherUsernames.has(t.username)) {
+        await dbRemove(`teachers/${t.id}`);
+        cleanedTeachers++;
+      } else {
+        teacherUsernames.add(t.username);
+      }
+    }
+
+    // Cleanup Students
+    const studentUsernames = new Set();
+    for (const s of students) {
+      if (studentUsernames.has(s.username)) {
+        await dbRemove(`students/${s.id}`);
+        cleanedStudents++;
+      } else {
+        studentUsernames.add(s.username);
+      }
+    }
+
+    if (cleanedTeachers > 0 || cleanedStudents > 0) {
+      toast({ 
+        title: "Cleanup Complete", 
+        description: `Removed ${cleanedTeachers} duplicate teachers and ${cleanedStudents} duplicate students.` 
+      });
+    } else {
+      toast({ title: "Clean", description: "No duplicate entries found." });
+    }
   };
 
   const handleSendReply = async () => {
@@ -520,13 +669,27 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
     );
   }
 
+  // Get unique counts for dashboard statistics to avoid double-counting
+  const uniqueTeachersCount = new Set(teachers.map(t => t.username)).size;
+  const uniqueStudentsCount = new Set(students.map(s => s.username)).size;
+  const uniqueClassesCount = new Set(classes.map(c => c.name)).size;
+
   if (currentPage === 'dashboard') {
     return (
       <div ref={ref} className="space-y-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-display font-bold">Admin Overview</h2>
+            <p className="text-muted-foreground">Manage your school's data and operations</p>
+          </div>
+          <Button variant="outline" onClick={handleCleanupDuplicates} className="border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700">
+            <Shield className="w-4 h-4 mr-2" /> Cleanup Duplicates
+          </Button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard title="Total Teachers" value={teachers.length} icon={Users} gradient="bg-gradient-primary" delay={0} />
-          <StatCard title="Total Classes" value={classes.length} icon={BookOpen} gradient="bg-gradient-gold" delay={0.1} />
-          <StatCard title="Total Students" value={students.length} icon={GraduationCap} gradient="bg-gradient-success" delay={0.2} />
+          <StatCard title="Total Teachers" value={uniqueTeachersCount} icon={Users} gradient="bg-gradient-primary" delay={0} />
+          <StatCard title="Total Classes" value={uniqueClassesCount} icon={BookOpen} gradient="bg-gradient-gold" delay={0.1} />
+          <StatCard title="Total Students" value={uniqueStudentsCount} icon={GraduationCap} gradient="bg-gradient-success" delay={0.2} />
           <StatCard title="Announcements" value={announcements.length} icon={Megaphone} gradient="bg-gradient-warm" delay={0.3} />
         </div>
 
@@ -536,6 +699,7 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
             <CardContent className="space-y-3">
               {[
                 { icon: Megaphone, label: 'Post Announcement', panel: 'announcement' },
+                { icon: Sparkles, label: 'Social Popup', panel: 'popup' },
                 { icon: UserPlus, label: 'Add Teacher', panel: 'teacher' },
                 { icon: School, label: 'Create Class', panel: 'class' },
                 { icon: GraduationCap, label: 'Enroll Student', panel: 'student' },
@@ -661,6 +825,40 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
             <Button className="w-full bg-gradient-primary" onClick={handleAddStudent}><Save className="w-4 h-4 mr-2" />Enroll Student</Button>
           </div>
         </SlidePanel>
+
+        <SlidePanel isOpen={showPanel === 'popup'} onClose={() => setShowPanel(null)} title="Social Media Popup Settings">
+          <div className="space-y-6">
+            <div className="p-4 rounded-2xl bg-muted/50 border border-border/50 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-semibold">Enable Popup</label>
+                  <p className="text-xs text-muted-foreground">Show social links to all visitors</p>
+                </div>
+                <Switch 
+                  checked={popupConfig.enabled} 
+                  onCheckedChange={(val) => setPopupConfig({ ...popupConfig, enabled: val })} 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Banner Text</label>
+              <Textarea 
+                placeholder="Enter a cool banner text (e.g., Join our community!)" 
+                rows={3} 
+                value={popupConfig.bannerText} 
+                onChange={(e) => setPopupConfig({ ...popupConfig, bannerText: e.target.value })} 
+              />
+              <p className="text-xs text-muted-foreground italic">This text will appear at the top of the popup.</p>
+            </div>
+
+            <div className="pt-4">
+              <Button className="w-full bg-gradient-primary h-11 rounded-xl shadow-lg" onClick={handleUpdatePopupConfig}>
+                <Save className="w-4 h-4 mr-2" /> Save Settings
+              </Button>
+            </div>
+          </div>
+        </SlidePanel>
       </div>
     );
   }
@@ -741,7 +939,23 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
                     <div className="w-12 h-12 rounded-2xl bg-gradient-primary flex items-center justify-center"><span className="font-display font-bold text-primary-foreground">{t.name.charAt(0)}</span></div>
                     <div><h4 className="font-semibold">{t.name}</h4><p className="text-sm text-muted-foreground">{t.subject}</p><p className="text-xs text-muted-foreground">@{t.username}</p></div>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => dbRemove(`teachers/${t.id}`)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4" /></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => {
+                        setSelectedUser({ id: t.id, name: t.name, role: 'teacher' });
+                        setShowPanel('change-password');
+                      }}>
+                        <Lock className="w-4 h-4 mr-2" /> Change Password
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => dbRemove(`teachers/${t.id}`)} className="text-destructive">
+                        <Trash2 className="w-4 h-4 mr-2" /> Delete Teacher
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </CardContent>
             </Card>
@@ -767,6 +981,39 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
             </div>
             <Button className="w-full bg-gradient-primary" onClick={handleAddTeacher}><Save className="w-4 h-4 mr-2" />Save Teacher</Button>
           </div>
+        </SlidePanel>
+
+        <SlidePanel 
+          isOpen={showPanel === 'change-password'} 
+          onClose={() => { setShowPanel(null); setSelectedUser(null); setNewPassword(''); }} 
+          title="Change Password"
+        >
+          {selectedUser && (
+            <div className="space-y-6">
+              <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
+                <p className="text-sm text-muted-foreground">{selectedUser.role === 'teacher' ? 'Teacher' : 'Student'}</p>
+                <p className="font-bold text-lg">{selectedUser.name}</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">New Password</label>
+                <Input 
+                  type="password" 
+                  placeholder="Enter new password" 
+                  value={newPassword} 
+                  onChange={(e) => setNewPassword(e.target.value)} 
+                />
+              </div>
+              <div className="pt-4">
+                <Button 
+                  className="w-full bg-gradient-primary" 
+                  onClick={handleUpdatePassword}
+                  disabled={!newPassword.trim() || isSubmitting}
+                >
+                  {isSubmitting ? 'Updating...' : 'Update Password'}
+                </Button>
+              </div>
+            </div>
+          )}
         </SlidePanel>
       </div>
     );
@@ -950,7 +1197,29 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
                     <div className="w-12 h-12 rounded-2xl bg-gradient-success flex items-center justify-center"><span className="font-display font-bold text-primary-foreground">{s.name.charAt(0)}</span></div>
                     <div><h4 className="font-semibold">{s.name}</h4><p className="text-sm text-muted-foreground">{s.className}</p><p className="text-xs text-muted-foreground">@{s.username}</p></div>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => dbRemove(`students/${s.id}`)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4" /></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleGraduateStudent(s)}>
+                        <TrendingUp className="w-4 h-4 mr-2 text-green-500" /> Graduate
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDemoteStudent(s)}>
+                        <TrendingUp className="w-4 h-4 mr-2 text-orange-500 rotate-180" /> Demote
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => {
+                        setSelectedUser({ id: s.id, name: s.name, role: 'student' });
+                        setShowPanel('change-password');
+                      }}>
+                        <Lock className="w-4 h-4 mr-2" /> Change Password
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleExitStudent(s)}>
+                        <Trash2 className="w-4 h-4 mr-2 text-destructive" /> Exit School
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </CardContent>
             </Card>
@@ -979,6 +1248,84 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
             </div>
             <Button className="w-full bg-gradient-primary" onClick={handleAddStudent}><Save className="w-4 h-4 mr-2" />Enroll Student</Button>
           </div>
+        </SlidePanel>
+
+        <SlidePanel 
+          isOpen={showPanel === 'promote'} 
+          onClose={() => { setShowPanel(null); setSelectedStudent(null); }} 
+          title={promoteAction === 'graduate' ? 'Graduate Student' : 'Demote Student'}
+        >
+          {selectedStudent && (
+            <div className="space-y-6">
+              <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
+                <p className="text-sm text-muted-foreground">Student</p>
+                <p className="font-bold text-lg">{selectedStudent.name}</p>
+                <p className="text-xs text-muted-foreground">Current Class: {selectedStudent.className}</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Select Target Class</label>
+                <select 
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-background" 
+                  value={targetClassId} 
+                  onChange={(e) => setTargetClassId(e.target.value)}
+                >
+                  <option value="">Select target class</option>
+                  {promoteAction === 'graduate' && <option value="graduate_out">Graduate out of School (Complete)</option>}
+                  {classes
+                    .filter(c => c.id !== selectedStudent.classId)
+                    .sort((a, b) => parseInt(a.grade) - parseInt(b.grade))
+                    .map(c => (
+                      <option key={c.id} value={c.id}>Grade {c.grade} - {c.name}</option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              <div className="pt-4">
+                <Button 
+                  className="w-full bg-gradient-primary" 
+                  onClick={handleConfirmPromotion}
+                  disabled={!targetClassId || isSubmitting}
+                >
+                  {isSubmitting ? 'Processing...' : `Confirm ${promoteAction === 'graduate' ? 'Graduation' : 'Demotion'}`}
+                </Button>
+              </div>
+            </div>
+          )}
+        </SlidePanel>
+
+        <SlidePanel 
+          isOpen={showPanel === 'change-password'} 
+          onClose={() => { setShowPanel(null); setSelectedUser(null); setNewPassword(''); }} 
+          title="Change Password"
+        >
+          {selectedUser && (
+            <div className="space-y-6">
+              <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
+                <p className="text-sm text-muted-foreground">{selectedUser.role === 'teacher' ? 'Teacher' : 'Student'}</p>
+                <p className="font-bold text-lg">{selectedUser.name}</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">New Password</label>
+                <Input 
+                  type="password" 
+                  placeholder="Enter new password" 
+                  value={newPassword} 
+                  onChange={(e) => setNewPassword(e.target.value)} 
+                />
+              </div>
+              <div className="pt-4">
+                <Button 
+                  className="w-full bg-gradient-primary" 
+                  onClick={handleUpdatePassword}
+                  disabled={!newPassword.trim() || isSubmitting}
+                >
+                  {isSubmitting ? 'Updating...' : 'Update Password'}
+                </Button>
+              </div>
+            </div>
+          )}
         </SlidePanel>
       </div>
     );
