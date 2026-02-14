@@ -502,9 +502,11 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
     </Card>
   );
 
+  let content: React.ReactNode = null;
+
   // Timetable page
   if (currentPage === 'timetable') {
-    return (
+    content = (
       <div ref={ref}>
         <TimetablePanel currentPage={currentPage} />
       </div>
@@ -512,8 +514,8 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
   }
 
   // Reports/Analytics page
-  if (currentPage === 'reports') {
-    return (
+  else if (currentPage === 'reports') {
+    content = (
       <div ref={ref}>
         <AnalyticsPanel currentPage={currentPage} />
       </div>
@@ -521,16 +523,16 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
   }
 
   // Settings page
-  if (currentPage === 'settings') {
-    return (
+  else if (currentPage === 'settings') {
+    content = (
       <div ref={ref}>
         <SettingsPanel currentPage={currentPage} />
       </div>
     );
   }
 
-  if (currentPage === 'complaints') {
-    return (
+  else if (currentPage === 'complaints') {
+    content = (
       <div ref={ref} className="h-[calc(100vh-120px)] flex bg-background rounded-2xl overflow-hidden shadow-2xl border border-border/50">
         {/* Sidebar */}
         <div className="w-[350px] flex flex-col border-r border-border/50 bg-muted/10">
@@ -715,7 +717,7 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
   const uniqueClassesCount = new Set(classes.map(c => c.name)).size;
 
   if (currentPage === 'dashboard') {
-    return (
+    content = (
       <div ref={ref} className="space-y-8">
         <div className="flex justify-between items-center">
           <div>
@@ -774,212 +776,12 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
             </CardContent>
           </Card>
         </div>
-
-        {/* Slide Panels */}
-        <SlidePanel isOpen={showPanel === 'announcement'} onClose={() => setShowPanel(null)} title="Post Announcement">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Title</label>
-              <Input placeholder="Announcement title" value={newAnnouncement.title} onChange={(e) => setNewAnnouncement({...newAnnouncement, title: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Content</label>
-              <Textarea placeholder="Write your announcement..." rows={4} value={newAnnouncement.content} onChange={(e) => setNewAnnouncement({...newAnnouncement, content: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Priority</label>
-              <select className="w-full h-10 px-3 rounded-lg border border-input bg-background" value={newAnnouncement.priority} onChange={(e) => setNewAnnouncement({...newAnnouncement, priority: e.target.value as any})}>
-                <option value="normal">Normal</option>
-                <option value="important">Important</option>
-                <option value="urgent">Urgent</option>
-              </select>
-            </div>
-            <Button className="w-full bg-gradient-primary" onClick={handleAddAnnouncement}><Send className="w-4 h-4 mr-2" />Post Announcement</Button>
-          </div>
-        </SlidePanel>
-
-        <SlidePanel isOpen={showPanel === 'teacher'} onClose={() => setShowPanel(null)} title="Add New Teacher">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-              <Input placeholder="Enter full name" value={newTeacher.name} onChange={(e) => setNewTeacher({...newTeacher, name: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Subject</label>
-              <Input placeholder="Teaching subject" value={newTeacher.subject} onChange={(e) => setNewTeacher({...newTeacher, subject: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Username</label>
-              <Input placeholder="Login username" value={newTeacher.username} onChange={(e) => setNewTeacher({...newTeacher, username: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Password</label>
-              <Input type="password" placeholder="Set password" value={newTeacher.password} onChange={(e) => setNewTeacher({...newTeacher, password: e.target.value})} />
-            </div>
-            <Button className="w-full bg-gradient-primary" onClick={handleAddTeacher}><Save className="w-4 h-4 mr-2" />Save Teacher</Button>
-          </div>
-        </SlidePanel>
-
-        <SlidePanel isOpen={showPanel === 'class'} onClose={() => setShowPanel(null)} title="Create New Class">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Class Name</label>
-              <Input placeholder="e.g., Class 10A" value={newClass.name} onChange={(e) => setNewClass({...newClass, name: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Grade</label>
-              <Input placeholder="e.g., 10" value={newClass.grade} onChange={(e) => setNewClass({...newClass, grade: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Assign Teacher</label>
-              <select className="w-full h-10 px-3 rounded-lg border border-input bg-background" value={newClass.teacherId} onChange={(e) => setNewClass({...newClass, teacherId: e.target.value})}>
-                <option value="">Select a teacher</option>
-                {teachers.map(t => <option key={t.id} value={t.id}>{t.name} ({t.subject})</option>)}
-              </select>
-            </div>
-            <Button className="w-full bg-gradient-primary" onClick={handleAddClass}><Save className="w-4 h-4 mr-2" />Create Class</Button>
-          </div>
-        </SlidePanel>
-
-        <SlidePanel isOpen={showPanel === 'student'} onClose={() => setShowPanel(null)} title="Enroll New Student">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-              <Input placeholder="Student's full name" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Username</label>
-              <Input placeholder="Login username" value={newStudent.username} onChange={(e) => setNewStudent({...newStudent, username: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Password</label>
-              <Input type="password" placeholder="Set password" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Assign to Class</label>
-              <select className="w-full h-10 px-3 rounded-lg border border-input bg-background" value={newStudent.classId} onChange={(e) => setNewStudent({...newStudent, classId: e.target.value})}>
-                <option value="">Select a class</option>
-                {classes.map(c => <option key={c.id} value={c.id}>{c.name} (Grade {c.grade})</option>)}
-              </select>
-            </div>
-            <Button className="w-full bg-gradient-primary" onClick={handleAddStudent}><Save className="w-4 h-4 mr-2" />Enroll Student</Button>
-          </div>
-        </SlidePanel>
-
-        <SlidePanel 
-          isOpen={showPanel === 'edit-user'} 
-          onClose={() => { setShowPanel(null); setEditingUser(null); }} 
-          title={`Edit ${editingUser?.role === 'teacher' ? 'Teacher' : 'Student'} Details`}
-        >
-          {editingUser && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-                <Input 
-                  placeholder="Enter full name" 
-                  value={editingUser.name} 
-                  onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })} 
-                />
-              </div>
-              
-              {editingUser.role === 'teacher' && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Subject</label>
-                  <Input 
-                    placeholder="Teaching subject" 
-                    value={editingUser.subject || ''} 
-                    onChange={(e) => setEditingUser({ ...editingUser, subject: e.target.value })} 
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Username</label>
-                <Input 
-                  placeholder="Login username" 
-                  value={editingUser.username} 
-                  onChange={(e) => setEditingUser({ ...editingUser, username: e.target.value })} 
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Password</label>
-                <Input 
-                  type="text" 
-                  placeholder="Set password" 
-                  value={editingUser.password} 
-                  onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })} 
-                />
-                <p className="text-xs text-muted-foreground italic">Password is visible for admin editing.</p>
-              </div>
-
-              {editingUser.role === 'student' && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Class</label>
-                  <select 
-                    className="w-full h-10 px-3 rounded-lg border border-input bg-background" 
-                    value={editingUser.classId || ''} 
-                    onChange={(e) => setEditingUser({ ...editingUser, classId: e.target.value })}
-                  >
-                    <option value="">Select a class</option>
-                    {classes.map(c => <option key={c.id} value={c.id}>{c.name} (Grade {c.grade})</option>)}
-                  </select>
-                </div>
-              )}
-
-              <div className="pt-4">
-                <Button 
-                  className="w-full bg-gradient-primary h-11 rounded-xl shadow-lg" 
-                  onClick={handleUpdateUser}
-                  disabled={isSubmitting}
-                >
-                  <Save className="w-4 h-4 mr-2" /> 
-                  {isSubmitting ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </SlidePanel>
-
-        <SlidePanel isOpen={showPanel === 'popup'} onClose={() => setShowPanel(null)} title="Social Media Popup Settings">
-          <div className="space-y-6">
-            <div className="p-4 rounded-2xl bg-muted/50 border border-border/50 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <label className="text-sm font-semibold">Enable Popup</label>
-                  <p className="text-xs text-muted-foreground">Show social links to all visitors</p>
-                </div>
-                <Switch 
-                  checked={popupConfig.enabled} 
-                  onCheckedChange={(val) => setPopupConfig({ ...popupConfig, enabled: val })} 
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Banner Text</label>
-              <Textarea 
-                placeholder="Enter a cool banner text (e.g., Join our community!)" 
-                rows={3} 
-                value={popupConfig.bannerText} 
-                onChange={(e) => setPopupConfig({ ...popupConfig, bannerText: e.target.value })} 
-              />
-              <p className="text-xs text-muted-foreground italic">This text will appear at the top of the popup.</p>
-            </div>
-
-            <div className="pt-4">
-              <Button className="w-full bg-gradient-primary h-11 rounded-xl shadow-lg" onClick={handleUpdatePopupConfig}>
-                <Save className="w-4 h-4 mr-2" /> Save Settings
-              </Button>
-            </div>
-          </div>
-        </SlidePanel>
       </div>
     );
   }
 
-  if (currentPage === 'announcements') {
-    return (
+  else if (currentPage === 'announcements') {
+    content = (
       <div ref={ref} className="space-y-6">
         <div className="flex items-center justify-between">
           <div><h3 className="text-2xl font-display font-bold">Announcements</h3><p className="text-muted-foreground">Manage school announcements</p></div>
@@ -1004,32 +806,13 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
             </Card>
           ))}
         </div>
-        <SlidePanel isOpen={showPanel === 'announcement'} onClose={() => setShowPanel(null)} title="Post Announcement">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Title</label>
-              <Input placeholder="Announcement title" value={newAnnouncement.title} onChange={(e) => setNewAnnouncement({...newAnnouncement, title: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Content</label>
-              <Textarea placeholder="Write your announcement..." rows={4} value={newAnnouncement.content} onChange={(e) => setNewAnnouncement({...newAnnouncement, content: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Priority</label>
-              <select className="w-full h-10 px-3 rounded-lg border border-input bg-background" value={newAnnouncement.priority} onChange={(e) => setNewAnnouncement({...newAnnouncement, priority: e.target.value as any})}>
-                <option value="normal">Normal</option><option value="important">Important</option><option value="urgent">Urgent</option>
-              </select>
-            </div>
-            <Button className="w-full bg-gradient-primary" onClick={handleAddAnnouncement}><Send className="w-4 h-4 mr-2" />Post</Button>
-          </div>
-        </SlidePanel>
       </div>
     );
   }
 
-  if (currentPage === 'teachers') {
+  else if (currentPage === 'teachers') {
     const filtered = teachers.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    return (
+    content = (
       <div ref={ref} className="space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div><h3 className="text-2xl font-display font-bold">Teachers</h3><p className="text-muted-foreground">Manage teaching staff</p></div>
@@ -1082,66 +865,12 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
             </Card>
           ))}
         </div>
-        <SlidePanel isOpen={showPanel === 'teacher'} onClose={() => setShowPanel(null)} title="Add New Teacher">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-              <Input placeholder="Enter full name" value={newTeacher.name} onChange={(e) => setNewTeacher({...newTeacher, name: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Subject</label>
-              <Input placeholder="Teaching subject" value={newTeacher.subject} onChange={(e) => setNewTeacher({...newTeacher, subject: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Username</label>
-              <Input placeholder="Login username" value={newTeacher.username} onChange={(e) => setNewTeacher({...newTeacher, username: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Password</label>
-              <Input type="password" placeholder="Set password" value={newTeacher.password} onChange={(e) => setNewTeacher({...newTeacher, password: e.target.value})} />
-            </div>
-            <Button className="w-full bg-gradient-primary" onClick={handleAddTeacher}><Save className="w-4 h-4 mr-2" />Save Teacher</Button>
-          </div>
-        </SlidePanel>
-
-        <SlidePanel 
-          isOpen={showPanel === 'change-password'} 
-          onClose={() => { setShowPanel(null); setSelectedUser(null); setNewPassword(''); }} 
-          title="Change Password"
-        >
-          {selectedUser && (
-            <div className="space-y-6">
-              <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
-                <p className="text-sm text-muted-foreground">{selectedUser.role === 'teacher' ? 'Teacher' : 'Student'}</p>
-                <p className="font-bold text-lg">{selectedUser.name}</p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">New Password</label>
-                <Input 
-                  type="password" 
-                  placeholder="Enter new password" 
-                  value={newPassword} 
-                  onChange={(e) => setNewPassword(e.target.value)} 
-                />
-              </div>
-              <div className="pt-4">
-                <Button 
-                  className="w-full bg-gradient-primary" 
-                  onClick={handleUpdatePassword}
-                  disabled={!newPassword.trim() || isSubmitting}
-                >
-                  {isSubmitting ? 'Updating...' : 'Update Password'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </SlidePanel>
       </div>
     );
   }
 
-  if (currentPage === 'classes') {
-    return (
+  else if (currentPage === 'classes') {
+    content = (
       <div ref={ref} className="space-y-6">
         <div className="flex items-center justify-between">
           <div><h3 className="text-2xl font-display font-bold">Classes</h3><p className="text-muted-foreground">Manage school classes</p></div>
@@ -1206,94 +935,13 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
             </Card>
           ))}
         </div>
-        <SlidePanel isOpen={showPanel === 'class'} onClose={() => setShowPanel(null)} title="Create New Class">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Class Name</label>
-              <Input placeholder="e.g., Class 10A" value={newClass.name} onChange={(e) => setNewClass({...newClass, name: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Grade</label>
-              <Input placeholder="e.g., 10" value={newClass.grade} onChange={(e) => setNewClass({...newClass, grade: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Assign Teacher</label>
-              <select className="w-full h-10 px-3 rounded-lg border border-input bg-background" value={newClass.teacherId} onChange={(e) => setNewClass({...newClass, teacherId: e.target.value})}>
-                <option value="">Select a teacher</option>
-                {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            </div>
-            <Button className="w-full bg-gradient-primary" onClick={handleAddClass}><Save className="w-4 h-4 mr-2" />Create Class</Button>
-          </div>
-        </SlidePanel>
-        <SlidePanel isOpen={showPanel === 'manage-class'} onClose={() => setShowPanel(null)} title="Manage Class">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Class Name</label>
-              <Input placeholder="e.g., Class 10A" value={manageClass.name} onChange={(e) => setManageClass({ ...manageClass, name: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Grade</label>
-              <Input placeholder="e.g., 10" value={manageClass.grade} onChange={(e) => setManageClass({ ...manageClass, grade: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Primary Teacher</label>
-              <select className="w-full h-10 px-3 rounded-lg border border-input bg-background" value={manageClass.teacherId} onChange={(e) => setManageClass({ ...manageClass, teacherId: e.target.value })}>
-                <option value="">Select a teacher</option>
-                {teachers.map(t => <option key={t.id} value={t.id}>{t.name} ({t.subject})</option>)}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Secondary Teacher</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {teachers.map(t => (
-                  <label key={t.id} className="flex items-center gap-2 p-2 rounded-lg border border-input">
-                    <Checkbox
-                      checked={manageClass.secondaryTeacherIds.includes(t.id)}
-                      onCheckedChange={(checked) => {
-                        setManageClass(prev => {
-                          const set = new Set(prev.secondaryTeacherIds);
-                          if (checked) set.add(t.id); else set.delete(t.id);
-                          return { ...prev, secondaryTeacherIds: Array.from(set) };
-                        });
-                      }}
-                    />
-                    <span className="text-sm">{t.name} ({t.subject})</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <Button className="w-full bg-gradient-primary" onClick={handleUpdateClass}><Save className="w-4 h-4 mr-2" />Save Changes</Button>
-          </div>
-        </SlidePanel>
-        <SlidePanel isOpen={showPanel === 'add-secondary'} onClose={() => setShowPanel(null)} title="Add Secondary Teachers">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Select Teachers</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {teachers.map(t => (
-                  <label key={t.id} className="flex items-center gap-2 p-2 rounded-lg border border-input">
-                    <Checkbox
-                      checked={!!secondarySelections[t.id]}
-                      onCheckedChange={(checked) => {
-                        setSecondarySelections(prev => ({ ...prev, [t.id]: !!checked }));
-                      }}
-                    />
-                    <span className="text-sm">{t.name} ({t.subject})</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <Button className="w-full bg-gradient-primary" onClick={handleAddSecondaryTeacher}><Save className="w-4 h-4 mr-2" />Add</Button>
-          </div>
-        </SlidePanel>
       </div>
     );
   }
 
-  if (currentPage === 'students') {
+  else if (currentPage === 'students') {
     const filtered = students.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    return (
+    content = (
       <div ref={ref} className="space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div><h3 className="text-2xl font-display font-bold">Students</h3><p className="text-muted-foreground">Manage enrolled students</p></div>
@@ -1352,113 +1000,338 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
             </Card>
           ))}
         </div>
-        <SlidePanel isOpen={showPanel === 'student'} onClose={() => setShowPanel(null)} title="Enroll New Student">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-              <Input placeholder="Student's full name" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Username</label>
-              <Input placeholder="Login username" value={newStudent.username} onChange={(e) => setNewStudent({...newStudent, username: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Password</label>
-              <Input type="password" placeholder="Set password" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Assign to Class</label>
-              <select className="w-full h-10 px-3 rounded-lg border border-input bg-background" value={newStudent.classId} onChange={(e) => setNewStudent({...newStudent, classId: e.target.value})}>
-                <option value="">Select a class</option>
-                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-            <Button className="w-full bg-gradient-primary" onClick={handleAddStudent}><Save className="w-4 h-4 mr-2" />Enroll Student</Button>
-          </div>
-        </SlidePanel>
-
-        <SlidePanel 
-          isOpen={showPanel === 'promote'} 
-          onClose={() => { setShowPanel(null); setSelectedStudent(null); }} 
-          title={promoteAction === 'graduate' ? 'Graduate Student' : 'Demote Student'}
-        >
-          {selectedStudent && (
-            <div className="space-y-6">
-              <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
-                <p className="text-sm text-muted-foreground">Student</p>
-                <p className="font-bold text-lg">{selectedStudent.name}</p>
-                <p className="text-xs text-muted-foreground">Current Class: {selectedStudent.className}</p>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Select Target Class</label>
-                <select 
-                  className="w-full h-10 px-3 rounded-lg border border-input bg-background" 
-                  value={targetClassId} 
-                  onChange={(e) => setTargetClassId(e.target.value)}
-                >
-                  <option value="">Select target class</option>
-                  {promoteAction === 'graduate' && <option value="graduate_out">Graduate out of School (Complete)</option>}
-                  {classes
-                    .filter(c => c.id !== selectedStudent.classId)
-                    .sort((a, b) => parseInt(a.grade) - parseInt(b.grade))
-                    .map(c => (
-                      <option key={c.id} value={c.id}>Grade {c.grade} - {c.name}</option>
-                    ))
-                  }
-                </select>
-              </div>
-
-              <div className="pt-4">
-                <Button 
-                  className="w-full bg-gradient-primary" 
-                  onClick={handleConfirmPromotion}
-                  disabled={!targetClassId || isSubmitting}
-                >
-                  {isSubmitting ? 'Processing...' : `Confirm ${promoteAction === 'graduate' ? 'Graduation' : 'Demotion'}`}
-                </Button>
-              </div>
-            </div>
-          )}
-        </SlidePanel>
-
-        <SlidePanel 
-          isOpen={showPanel === 'change-password'} 
-          onClose={() => { setShowPanel(null); setSelectedUser(null); setNewPassword(''); }} 
-          title="Change Password"
-        >
-          {selectedUser && (
-            <div className="space-y-6">
-              <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
-                <p className="text-sm text-muted-foreground">{selectedUser.role === 'teacher' ? 'Teacher' : 'Student'}</p>
-                <p className="font-bold text-lg">{selectedUser.name}</p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">New Password</label>
-                <Input 
-                  type="password" 
-                  placeholder="Enter new password" 
-                  value={newPassword} 
-                  onChange={(e) => setNewPassword(e.target.value)} 
-                />
-              </div>
-              <div className="pt-4">
-                <Button 
-                  className="w-full bg-gradient-primary" 
-                  onClick={handleUpdatePassword}
-                  disabled={!newPassword.trim() || isSubmitting}
-                >
-                  {isSubmitting ? 'Updating...' : 'Update Password'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </SlidePanel>
       </div>
     );
   }
 
-  return <div ref={ref} className="text-center py-16 text-muted-foreground">Select a section from the menu</div>;
+  return (
+    <>
+      {content}
+      
+      {/* Global Panels */}
+      <SlidePanel isOpen={showPanel === 'teacher'} onClose={() => setShowPanel(null)} title="Add New Teacher">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+            <Input placeholder="Teacher's full name" value={newTeacher.name} onChange={(e) => setNewTeacher({...newTeacher, name: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Subject</label>
+            <Input placeholder="e.g., Mathematics" value={newTeacher.subject} onChange={(e) => setNewTeacher({...newTeacher, subject: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Username</label>
+            <Input placeholder="Login username" value={newTeacher.username} onChange={(e) => setNewTeacher({...newTeacher, username: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Password</label>
+            <Input type="password" placeholder="Set password" value={newTeacher.password} onChange={(e) => setNewTeacher({...newTeacher, password: e.target.value})} />
+          </div>
+          <Button className="w-full bg-gradient-primary" onClick={handleAddTeacher}><Save className="w-4 h-4 mr-2" />Add Teacher</Button>
+        </div>
+      </SlidePanel>
+
+      <SlidePanel isOpen={showPanel === 'class'} onClose={() => setShowPanel(null)} title="Create New Class">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Class Name</label>
+            <Input placeholder="e.g., Class 10A" value={newClass.name} onChange={(e) => setNewClass({...newClass, name: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Grade</label>
+            <Input placeholder="e.g., 10" value={newClass.grade} onChange={(e) => setNewClass({...newClass, grade: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Assign Teacher</label>
+            <select className="w-full h-10 px-3 rounded-lg border border-input bg-background" value={newClass.teacherId} onChange={(e) => setNewClass({...newClass, teacherId: e.target.value})}>
+              <option value="">Select a teacher</option>
+              {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <Button className="w-full bg-gradient-primary" onClick={handleAddClass}><Save className="w-4 h-4 mr-2" />Create Class</Button>
+        </div>
+      </SlidePanel>
+
+      <SlidePanel isOpen={showPanel === 'manage-class'} onClose={() => setShowPanel(null)} title="Manage Class">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Class Name</label>
+            <Input placeholder="e.g., Class 10A" value={manageClass.name} onChange={(e) => setManageClass({ ...manageClass, name: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Grade</label>
+            <Input placeholder="e.g., 10" value={manageClass.grade} onChange={(e) => setManageClass({ ...manageClass, grade: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Primary Teacher</label>
+            <select className="w-full h-10 px-3 rounded-lg border border-input bg-background" value={manageClass.teacherId} onChange={(e) => setManageClass({ ...manageClass, teacherId: e.target.value })}>
+              <option value="">Select a teacher</option>
+              {teachers.map(t => <option key={t.id} value={t.id}>{t.name} ({t.subject})</option>)}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Secondary Teacher</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {teachers.map(t => (
+                <label key={t.id} className="flex items-center gap-2 p-2 rounded-lg border border-input">
+                  <Checkbox
+                    checked={manageClass.secondaryTeacherIds.includes(t.id)}
+                    onCheckedChange={(checked) => {
+                      setManageClass(prev => {
+                        const set = new Set(prev.secondaryTeacherIds);
+                        if (checked) set.add(t.id); else set.delete(t.id);
+                        return { ...prev, secondaryTeacherIds: Array.from(set) };
+                      });
+                    }}
+                  />
+                  <span className="text-sm">{t.name} ({t.subject})</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <Button className="w-full bg-gradient-primary" onClick={handleUpdateClass}><Save className="w-4 h-4 mr-2" />Save Changes</Button>
+        </div>
+      </SlidePanel>
+
+      <SlidePanel isOpen={showPanel === 'add-secondary'} onClose={() => setShowPanel(null)} title="Add Secondary Teachers">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Select Teachers</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {teachers.map(t => (
+                <label key={t.id} className="flex items-center gap-2 p-2 rounded-lg border border-input">
+                  <Checkbox
+                    checked={!!secondarySelections[t.id]}
+                    onCheckedChange={(checked) => {
+                      setSecondarySelections(prev => ({ ...prev, [t.id]: !!checked }));
+                    }}
+                  />
+                  <span className="text-sm">{t.name} ({t.subject})</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <Button className="w-full bg-gradient-primary" onClick={handleAddSecondaryTeacher}><Save className="w-4 h-4 mr-2" />Add</Button>
+        </div>
+      </SlidePanel>
+
+      <SlidePanel isOpen={showPanel === 'student'} onClose={() => setShowPanel(null)} title="Enroll New Student">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+            <Input placeholder="Student's full name" value={newStudent.name} onChange={(e) => setNewStudent({...newStudent, name: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Username</label>
+            <Input placeholder="Login username" value={newStudent.username} onChange={(e) => setNewStudent({...newStudent, username: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Password</label>
+            <Input type="password" placeholder="Set password" value={newStudent.password} onChange={(e) => setNewStudent({...newStudent, password: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Assign to Class</label>
+            <select className="w-full h-10 px-3 rounded-lg border border-input bg-background" value={newStudent.classId} onChange={(e) => setNewStudent({...newStudent, classId: e.target.value})}>
+              <option value="">Select a class</option>
+              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <Button className="w-full bg-gradient-primary" onClick={handleAddStudent}><Save className="w-4 h-4 mr-2" />Enroll Student</Button>
+        </div>
+      </SlidePanel>
+
+      <SlidePanel 
+        isOpen={showPanel === 'promote'} 
+        onClose={() => { setShowPanel(null); setSelectedStudent(null); }} 
+        title={promoteAction === 'graduate' ? 'Graduate Student' : 'Demote Student'}
+      >
+        {selectedStudent && (
+          <div className="space-y-6">
+            <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
+              <p className="text-sm text-muted-foreground">Student</p>
+              <p className="font-bold text-lg">{selectedStudent.name}</p>
+              <p className="text-xs text-muted-foreground">Current Class: {selectedStudent.className}</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Select Target Class</label>
+              <select 
+                className="w-full h-10 px-3 rounded-lg border border-input bg-background" 
+                value={targetClassId} 
+                onChange={(e) => setTargetClassId(e.target.value)}
+              >
+                <option value="">Select target class</option>
+                {promoteAction === 'graduate' && <option value="graduate_out">Graduate out of School (Complete)</option>}
+                {classes
+                  .filter(c => c.id !== selectedStudent.classId)
+                  .sort((a, b) => parseInt(a.grade) - parseInt(b.grade))
+                  .map(c => (
+                    <option key={c.id} value={c.id}>Grade {c.grade} - {c.name}</option>
+                  ))
+                }
+              </select>
+            </div>
+
+            <div className="pt-4">
+              <Button 
+                className="w-full bg-gradient-primary" 
+                onClick={handleConfirmPromotion}
+                disabled={!targetClassId || isSubmitting}
+              >
+                {isSubmitting ? 'Processing...' : `Confirm ${promoteAction === 'graduate' ? 'Graduation' : 'Demotion'}`}
+              </Button>
+            </div>
+          </div>
+        )}
+      </SlidePanel>
+
+      <SlidePanel 
+        isOpen={showPanel === 'change-password'} 
+        onClose={() => { setShowPanel(null); setSelectedUser(null); setNewPassword(''); }} 
+        title="Change Password"
+      >
+        {selectedUser && (
+          <div className="space-y-6">
+            <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
+              <p className="text-sm text-muted-foreground">{selectedUser.role === 'teacher' ? 'Teacher' : 'Student'}</p>
+              <p className="font-bold text-lg">{selectedUser.name}</p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">New Password</label>
+              <Input 
+                type="password" 
+                placeholder="Enter new password" 
+                value={newPassword} 
+                onChange={(e) => setNewPassword(e.target.value)} 
+              />
+            </div>
+            <div className="pt-4">
+              <Button 
+                className="w-full bg-gradient-primary" 
+                onClick={handleUpdatePassword}
+                disabled={!newPassword.trim() || isSubmitting}
+              >
+                {isSubmitting ? 'Updating...' : 'Update Password'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </SlidePanel>
+
+      <SlidePanel 
+        isOpen={showPanel === 'edit-user'} 
+        onClose={() => { setShowPanel(null); setEditingUser(null); }} 
+        title={`Edit ${editingUser?.role === 'teacher' ? 'Teacher' : 'Student'}`}
+      >
+        {editingUser && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+              <Input 
+                value={editingUser.name} 
+                onChange={(e) => setEditingUser({...editingUser, name: e.target.value})} 
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Username</label>
+              <Input 
+                value={editingUser.username} 
+                onChange={(e) => setEditingUser({...editingUser, username: e.target.value})} 
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Password</label>
+              <Input 
+                type="password"
+                value={editingUser.password} 
+                onChange={(e) => setEditingUser({...editingUser, password: e.target.value})} 
+              />
+            </div>
+            {editingUser.role === 'teacher' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Subject</label>
+                <Input 
+                  value={editingUser.subject || ''} 
+                  onChange={(e) => setEditingUser({...editingUser, subject: e.target.value})} 
+                />
+              </div>
+            )}
+            {editingUser.role === 'student' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Class</label>
+                <select 
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-background" 
+                  value={editingUser.classId || ''} 
+                  onChange={(e) => setEditingUser({...editingUser, classId: e.target.value})}
+                >
+                  <option value="">Select a class</option>
+                  {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            )}
+            <Button 
+              className="w-full bg-gradient-primary" 
+              onClick={handleUpdateUser}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        )}
+      </SlidePanel>
+
+      <SlidePanel isOpen={showPanel === 'announcement'} onClose={() => setShowPanel(null)} title="Post Announcement">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Title</label>
+            <Input placeholder="Announcement title" value={newAnnouncement.title} onChange={(e) => setNewAnnouncement({...newAnnouncement, title: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Content</label>
+            <textarea 
+              className="w-full min-h-[100px] p-3 rounded-lg border border-input bg-background text-sm" 
+              placeholder="Announcement content..." 
+              value={newAnnouncement.content} 
+              onChange={(e) => setNewAnnouncement({...newAnnouncement, content: e.target.value})}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Priority</label>
+            <select className="w-full h-10 px-3 rounded-lg border border-input bg-background" value={newAnnouncement.priority} onChange={(e) => setNewAnnouncement({...newAnnouncement, priority: e.target.value as any})}>
+              <option value="normal">Normal</option>
+              <option value="important">Important</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+          <Button className="w-full bg-gradient-primary" onClick={handleAddAnnouncement}><Save className="w-4 h-4 mr-2" />Post Announcement</Button>
+        </div>
+      </SlidePanel>
+
+      <SlidePanel isOpen={showPanel === 'popup'} onClose={() => setShowPanel(null)} title="Social Popup Configuration">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50">
+            <div className="space-y-0.5">
+              <label className="text-sm font-medium">Enable Popup</label>
+              <p className="text-xs text-muted-foreground">Show a banner at the top of all pages</p>
+            </div>
+            <Switch 
+              checked={popupConfig.enabled} 
+              onCheckedChange={(checked) => setPopupConfig({ ...popupConfig, enabled: checked })} 
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Banner Text</label>
+            <Input 
+              placeholder="e.g., Follow us on Instagram @school_handle" 
+              value={popupConfig.bannerText} 
+              onChange={(e) => setPopupConfig({ ...popupConfig, bannerText: e.target.value })} 
+            />
+          </div>
+          <Button className="w-full bg-gradient-primary" onClick={handleUpdatePopupConfig}><Save className="w-4 h-4 mr-2" />Save Configuration</Button>
+        </div>
+      </SlidePanel>
+    </>
+  );
 });
 
 AdminDashboard.displayName = 'AdminDashboard';
