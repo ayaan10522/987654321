@@ -23,7 +23,13 @@
       window.OneSignalDeferred.push(async function (OneSignal) {
         await OneSignal.init({
           appId: "e1b739f9-9ff3-4d1c-aeaa-72087c01cb6a",
+          allowLocalhostAsSecureOrigin: true,
         });
+        try {
+          await OneSignal.Notifications.requestPermission();
+        } catch (e) {
+          console.error("OneSignal permission request failed", e);
+        }
       });
     </script>
   </head>
