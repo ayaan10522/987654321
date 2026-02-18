@@ -42,15 +42,100 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
   const [classAnnouncements, setClassAnnouncements] = useState<ClassAnnouncement[]>([]);
   const [myComplaints, setMyComplaints] = useState<Complaint[]>([]);
 
+  const showNotification = (title: string, body: string) => {
+    if (typeof window === 'undefined') return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/favicon.jpg' });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') {
+          new Notification(title, { body, icon: '/favicon.jpg' });
+        }
+      });
+    }
+  };
+
   useEffect(() => {
     if (!user?.id) return;
     const unsubs = [
-      dbListen('homework', (data) => setHomework(data ? Object.entries(data).map(([id, h]: [string, any]) => ({ id, ...h })).filter((h: Homework) => h.classId === user?.classId).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()) : [])),
+      dbListen('homework', (data) => {
+        const list = data
+          ? Object.entries(data)
+              .map(([id, h]: [string, any]) => ({ id, ...h }))
+              .filter((h: Homework) => h.classId === user?.classId)
+              .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+          : [];
+        setHomework((prev) => {
+          const prevIds = new Set(prev.map((h) => h.id));
+          const newItems = list.filter((h) => !prevIds.has(h.id));
+          if (prev.length > 0 && newItems.length > 0) {
+            showNotification('New homework assigned', newItems[0].title);
+          }
+          return list;
+        });
+      }),
       dbListen('submissions', (data) => setMySubmissions(data ? Object.entries(data).map(([id, s]: [string, any]) => ({ id, ...s })).filter((s: Submission) => s.studentId === user?.id) : [])),
-      dbListen(`attendance/${user.id}`, (data) => setAttendance(data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })) : [])),
-      dbListen(`grades/${user.id}`, (data) => setGrades(data ? Object.entries(data).map(([id, g]: [string, any]) => ({ id, ...g })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [])),
-      dbListen('announcements', (data) => setSchoolAnnouncements(data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [])),
-      dbListen('classAnnouncements', (data) => setClassAnnouncements(data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })).filter((a: ClassAnnouncement) => a.classId === user?.classId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) : [])),
+      dbListen(`attendance/${user.id}`, (data) => {
+        const list = data ? Object.entries(data).map(([id, a]: [string, any]) => ({ id, ...a })) : [];
+        setAttendance((prev) => {
+          const prevIds = new Set(prev.map((a) => a.id));
+          const newItems = list.filter((a) => !prevIds.has(a.id));
+          if (prev.length > 0 && newItems.length > 0) {
+            showNotification('Attendance updated', 'Your attendance record has been updated');
+          }
+          return list;
+        });
+      }),
+      dbListen(`grades/${user.id}`, (data) => {
+        const list = data
+          ? Object.entries(data)
+              .map(([id, g]: [string, any]) => ({ id, ...g }))
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          : [];
+        setGrades((prev) => {
+          const prevIds = new Set(prev.map((g) => g.id));
+          const newItems = list.filter((g) => !prevIds.has(g.id));
+          if (prev.length > 0 && newItems.length > 0) {
+            const latest = newItems[0];
+            showNotification('New grade posted', latest.subject || 'A new grade has been added');
+          }
+          return list;
+        });
+      }),
+      dbListen('announcements', (data) => {
+        const list = data
+          ? Object.entries(data)
+              .map(([id, a]: [string, any]) => ({ id, ...a }))
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          : [];
+        setSchoolAnnouncements((prev) => {
+          const prevIds = new Set(prev.map((a) => a.id));
+          const newItems = list.filter((a) => !prevIds.has(a.id));
+          if (prev.length > 0 && newItems.length > 0) {
+            const latest = newItems[0];
+            showNotification('New school announcement', latest.title);
+          }
+          return list;
+        });
+      }),
+      dbListen('classAnnouncements', (data) => {
+        const list = data
+          ? Object.entries(data)
+              .map(([id, a]: [string, any]) => ({ id, ...a }))
+              .filter((a: ClassAnnouncement) => a.classId === user?.classId)
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          : [];
+        setClassAnnouncements((prev) => {
+          const prevIds = new Set(prev.map((a) => a.id));
+          const newItems = list.filter((a) => !prevIds.has(a.id));
+          if (prev.length > 0 && newItems.length > 0) {
+            const latest = newItems[0];
+            showNotification('New class announcement', latest.title);
+          }
+          return list;
+        });
+      }),
       dbListen('complaints', (data) => setMyComplaints(data ? Object.entries(data).map(([id, c]: [string, any]) => ({ id, ...c })).filter((c: Complaint) => c.studentId === user?.id).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : []))
     ];
     return () => unsubs.forEach(u => u());

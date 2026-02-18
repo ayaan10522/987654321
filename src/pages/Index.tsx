@@ -11,10 +11,26 @@ const AppContent: React.FC = () => {
   const { user, isLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
 
-  // Reset to dashboard when user changes
   useEffect(() => {
     setCurrentPage('dashboard');
   }, [user?.id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user?.id) return;
+    (window as any).OneSignalDeferred = (window as any).OneSignalDeferred || [];
+    (window as any).OneSignalDeferred.push(async (OneSignal: any) => {
+      try {
+        await OneSignal.login(user.id);
+        await OneSignal.User.addTag("role", user.role);
+        if (user.classId) {
+          await OneSignal.User.addTag("classId", user.classId);
+        }
+        await OneSignal.Notifications.requestPermission(true);
+      } catch (error) {
+        console.error('OneSignal user setup failed', error);
+      }
+    });
+  }, [user?.id, user?.role, user?.classId]);
 
   if (isLoading) {
     return (
