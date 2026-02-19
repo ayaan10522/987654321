@@ -22,11 +22,31 @@ const SocialMediaPopup = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [hasShown, setHasShown] = useState(false);
 
+  const showNotification = (title: string, body: string) => {
+    if (typeof window === 'undefined') return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/favicon.jpg' });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') {
+          new Notification(title, { body, icon: '/favicon.jpg' });
+        }
+      });
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = dbListen('settings/popup', (data) => {
       if (data) {
-        setConfig(data);
-        // Show popup if enabled and hasn't been shown in this session
+        setConfig(prev => {
+          const wasEnabled = prev?.enabled ?? false;
+          const isEnabled = data.enabled;
+          if (isEnabled && !wasEnabled) {
+            showNotification('New school update', data.bannerText || 'Check the new announcement from school');
+          }
+          return data;
+        });
         if (data.enabled && !hasShown) {
           setIsOpen(true);
           setHasShown(true);
