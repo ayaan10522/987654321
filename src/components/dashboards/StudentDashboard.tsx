@@ -8,11 +8,11 @@ import TimetablePanel from './TimetablePanel';
 import SettingsPanel from './SettingsPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { dbListen, dbPush } from '@/lib/firebase';
+import { dbListen, dbPush, dbUpdate } from '@/lib/firebase';
 import { 
   Calendar, ClipboardList, FileText, Bell, Check, X, 
   TrendingUp, Award, Clock, BookOpen, Megaphone, Upload,
-  CheckCircle2, AlertCircle, BarChart3, Star, Send
+  CheckCircle2, AlertCircle, BarChart3, Star, Send, MapPin
 } from 'lucide-react';
 
 interface Homework { id: string; title: string; description: string; dueDate: string; classId: string; className: string; subject: string; createdAt: string; }
@@ -41,6 +41,43 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
   const [schoolAnnouncements, setSchoolAnnouncements] = useState<Announcement[]>([]);
   const [classAnnouncements, setClassAnnouncements] = useState<ClassAnnouncement[]>([]);
   const [myComplaints, setMyComplaints] = useState<Complaint[]>([]);
+
+  const requestLocation = () => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          dbUpdate(`students/${user.id}`, {
+            location: {
+              lat: latitude,
+              lng: longitude,
+              updatedAt: new Date().toISOString()
+            }
+          });
+          toast({
+            title: "Location Updated",
+            description: "Your location has been shared with the admin.",
+          });
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          if (error.code === error.PERMISSION_DENIED) {
+            toast({
+              title: "Location Permission Denied",
+              description: "Please allow location access to share your position.",
+              variant: "destructive"
+            });
+          }
+        }
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.id) return;
+    // Ask for location permission on mount
+    requestLocation();
+  }, [user?.id]);
 
   const showNotification = (title: string, body: string) => {
     if (typeof window === 'undefined') return;
@@ -279,7 +316,18 @@ const StudentDashboard = forwardRef<HTMLDivElement, StudentDashboardProps>(({ cu
               <div>
                 <p className="text-primary-foreground/80 font-medium">Welcome back,</p>
                 <h2 className="text-3xl font-display font-bold text-primary-foreground mt-1">{user?.name}</h2>
-                <p className="text-primary-foreground/70 mt-2 flex items-center gap-2"><BookOpen className="w-4 h-4" />{user?.className || 'N/A'}</p>
+                <div className="flex items-center gap-4 mt-2">
+                  <p className="text-primary-foreground/70 flex items-center gap-2"><BookOpen className="w-4 h-4" />{user?.className || 'N/A'}</p>
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    className="bg-primary-foreground/20 hover:bg-primary-foreground/30 border-0 text-primary-foreground h-8"
+                    onClick={requestLocation}
+                  >
+                    <MapPin className="w-4 h-4 mr-2" />
+                    Share Location
+                  </Button>
+                </div>
               </div>
               <div className="hidden md:flex items-center gap-4">
                 <div className="text-center px-6 py-3 rounded-2xl bg-primary-foreground/10">

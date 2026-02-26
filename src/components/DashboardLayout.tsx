@@ -19,7 +19,8 @@ import {
   Settings,
   BarChart3,
   Clock,
-  MessageSquare
+  MessageSquare,
+  MapPin
 } from 'lucide-react';
 
 interface NavItem {
@@ -51,6 +52,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, currentPage
           { label: 'Students', icon: <GraduationCap className="w-5 h-5" />, path: 'students' },
           { label: 'Timetable', icon: <Clock className="w-5 h-5" />, path: 'timetable' },
           { label: 'Complaints', icon: <MessageSquare className="w-5 h-5" />, path: 'complaints' },
+          { label: 'Student Map', icon: <MapPin className="w-5 h-5" />, path: 'map' },
           { label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, path: 'reports' },
           { label: 'Settings', icon: <Settings className="w-5 h-5" />, path: 'settings' },
         ];

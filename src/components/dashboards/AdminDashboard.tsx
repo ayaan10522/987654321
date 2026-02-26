@@ -9,11 +9,12 @@ import SlidePanel from '@/components/ui/SlidePanel';
 import TimetablePanel from './TimetablePanel';
 import AnalyticsPanel from './AnalyticsPanel';
 import SettingsPanel from './SettingsPanel';
+import StudentMap from './StudentMap';
 import { 
   Users, GraduationCap, BookOpen, Plus, Trash2, Check, 
   Megaphone, Send, TrendingUp, Award, Search, Sparkles,
   UserPlus, School, Bell, Calendar, Clock, ChevronRight, Save, MoreVertical, Cog, Lock,
-  Download, Upload, Shield
+  Download, Upload, Shield, MapPin
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,7 +22,7 @@ import { Switch } from '@/components/ui/switch';
 
 interface Teacher { id: string; name: string; username: string; password: string; subject: string; }
 interface Class { id: string; name: string; grade: string; teacherId: string; teacherName: string; secondaryTeachers?: { id: string; name: string }[]; }
-interface Student { id: string; name: string; username: string; password: string; classId: string; className: string; }
+interface Student { id: string; name: string; username: string; password: string; classId: string; className: string; location?: { lat: number; lng: number; updatedAt: string; }; }
 interface Announcement { id: string; title: string; content: string; priority: 'normal' | 'important' | 'urgent'; createdAt: string; author: string; }
 interface Complaint { id: string; studentId: string; studentName: string; classId: string; className: string; subject: string; message: string; createdAt: string; status: 'sent' | 'read' | 'resolved'; read: boolean; sender?: 'student' | 'admin'; }
 
@@ -518,6 +519,31 @@ const AdminDashboard = forwardRef<HTMLDivElement, AdminDashboardProps>(({ curren
     content = (
       <div ref={ref}>
         <AnalyticsPanel currentPage={currentPage} />
+      </div>
+    );
+  }
+
+  // Map page
+  else if (currentPage === 'map') {
+    content = (
+      <div ref={ref} className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-display font-bold tracking-tight">Student Locations</h2>
+            <p className="text-muted-foreground">View real-time locations of students who have shared their position.</p>
+          </div>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-primary" />
+              Live Student Map
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StudentMap students={students} />
+          </CardContent>
+        </Card>
       </div>
     );
   }
